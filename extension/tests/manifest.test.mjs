@@ -24,6 +24,7 @@ test("manifest has required MV3 fields", async () => {
 
   assert.ok(Array.isArray(manifest.host_permissions));
   assert.ok(manifest.host_permissions.includes("https://*.zhipin.com/*"));
+  assert.ok(manifest.host_permissions.includes("http://localhost:8080/*"));
 
   assert.deepEqual(manifest.action, {
     default_title: "Job Agent",
