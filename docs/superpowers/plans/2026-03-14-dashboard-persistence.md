@@ -213,30 +213,50 @@ Create `server/src/test/java/com/jobagent/server/store/DashboardStoreTest.java`:
 ```java
 package com.jobagent.server.store;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.DraftItem;
 import com.jobagent.server.dto.RecommendationItem;
 import com.jobagent.server.dto.ReplyItem;
+import com.jobagent.server.repository.DashboardDraftRepository;
+import com.jobagent.server.repository.DashboardRecommendationRepository;
+import com.jobagent.server.repository.DashboardReplyRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-@Import(DashboardStore.class)
+@Import(DashboardStoreTest.TestConfig.class)
+@TestPropertySource(properties = "job-agent.dashboard.max-items=1")
 class DashboardStoreTest {
 
     @Autowired
     private DashboardStore store;
 
+    @Autowired
+    private DashboardRecommendationRepository recommendationRepository;
+
+    @Autowired
+    private DashboardDraftRepository draftRepository;
+
+    @Autowired
+    private DashboardReplyRepository replyRepository;
+
     @Test
-    void snapshotReturnsLatestAndMetrics() {
+    void snapshotReturnsLatestAndMetrics() throws InterruptedException {
         store.addRecommendation(new RecommendationItem("A", "C1", 80, List.of("r1")));
+        Thread.sleep(5);
+        store.addRecommendation(new RecommendationItem("B", "C1", 81, List.of("r2")));
         store.addDraft(new DraftItem("C1", "A", "d1"));
         store.addReply(new ReplyItem("C1", "INTERVIEW", "s1", "n1"));
+
+        assertThat(recommendationRepository.count()).isEqualTo(2);
 
         var snapshot = store.snapshot();
 
@@ -244,7 +264,23 @@ class DashboardStoreTest {
         assertThat(snapshot.metrics().drafts()).isEqualTo(1);
         assertThat(snapshot.metrics().replies()).isEqualTo(1);
         assertThat(snapshot.metrics().interviews()).isEqualTo(1);
-        assertThat(snapshot.recommendations().get(0).title()).isEqualTo("A");
+        assertThat(snapshot.recommendations().get(0).title()).isEqualTo("B");
+    }
+
+    @org.springframework.boot.test.context.TestConfiguration
+    static class TestConfig {
+        @Bean
+        DashboardStore dashboardStore(DashboardRecommendationRepository recommendationRepository,
+                                      DashboardDraftRepository draftRepository,
+                                      DashboardReplyRepository replyRepository,
+                                      ObjectMapper objectMapper) {
+            return new DashboardStore(recommendationRepository, draftRepository, replyRepository, objectMapper, 1);
+        }
+
+        @Bean
+        ObjectMapper objectMapper() {
+            return new ObjectMapper();
+        }
     }
 }
 ```
@@ -253,19 +289,20 @@ class DashboardStoreTest {
 
 Run: `cd server && /opt/homebrew/bin/mvn -Dmaven.repo.local=/Users/lushiwu/Documents/job-agent-mvp/.m2repo -Dtest=DashboardStoreTest test`
 
-Expected: wiring errors (DashboardStore still uses in-memory collections).
+Expected: assertion failure (repositories remain empty because in-memory store does not persist).
 
 - [ ] **Step 3: Update DashboardStore to JPA**
 
 Update `DashboardStore`:
 - Inject repositories + `ObjectMapper`
-- Read config `job-agent.dashboard.max-items` via `@Value`
+- Read config `job-agent.dashboard.max-items` via `@Value` (default 20)
 - Replace in-memory deques
 - Serialize reasons list to JSON (`[]` on failure)
 - Read reasons JSON back to List<String> (`List.of()` on failure)
 - Write `RecommendationItem/DraftItem/ReplyItem` to DB with UUID + timestamps
 - `snapshot()` uses `PageRequest.of(0, maxItems, Sort.by("createdAt").descending())`
 - Keep `clear()` for tests: delete all rows in the three repositories
+- For DB read failures: catch runtime exceptions in `snapshot()` and return empty `DashboardResponse` with zero metrics
 
 Pseudo-structure:
 
