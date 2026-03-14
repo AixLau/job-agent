@@ -97,7 +97,7 @@
 ### 7. 自动化等级
 - 保守：只分析推荐
 - 半自动：草稿生成，人工确认
-- 自动：低风险自动填充，高风险节点 HITL
+- 自动：低风险自动生成草稿，高风险 HITL；所有发送动作仍需用户确认
 
 ---
 
@@ -120,6 +120,9 @@
 
 **Conversation**
 - id, taskId, jobPostId, externalId, status, createdAt
+
+**Message**
+- id, conversationId, role, content, externalId, createdAt
 
 **MessageDraft**
 - id, conversationId, content, sourceType, approved, createdAt
@@ -160,6 +163,20 @@
 - 草稿生成 → DRAFTED（服务端 + Worker）
 - 用户点击发送 → SENT（插件）
 - 聊天上报 → REPLIED/NEEDS_REPLY（插件 + Worker）
+
+**状态映射**
+- Conversation 状态 = NEEDS_REPLY → JobPost 状态 = REPLIED
+- Conversation 状态 = INTERVIEW → JobPost 状态 = REPLIED
+- Conversation 状态 = CLOSED → JobPost 状态 = ARCHIVED
+
+---
+
+## 插件鉴权
+
+- 插件首次登录获取 `plugin_token`
+- `plugin_token` 绑定用户与浏览器实例
+- 过期时间 24h，支持刷新
+- 可在服务端撤销
 
 ---
 
@@ -213,6 +230,11 @@
   - `status` (string)
   - `ts` (number)
 
+**响应 Schema（最小）**
+- `PageReportResponse`: `status`, `analysis`, `draft`
+- `ChatReportResponse`: `status`, `reply`
+- `StatusResponse`: `status`
+
 **错误处理（统一）**
 - 4xx：参数缺失/鉴权失败
 - 5xx：系统错误（记录审计）
@@ -231,7 +253,7 @@
 - 输出：Match score + reasons + risks
 
 **ConversationGraph**
-- 输入：Conversation + JobPost + Resume
+- 输入：Conversation + JobPost + Resume + Messages
 - 输出：MessageDraft + ReplyIntent + NextAction
 
 **服务端与 Worker 集成契约**
@@ -239,6 +261,11 @@
 - 超时：10s
 - 重试：2 次
 - 幂等：基于 `task_id + external_id + stage`
+
+**Stage 枚举**
+- `JOB_MATCH`
+- `DRAFT`
+- `REPLY_CLASSIFY`
 
 **Checkpoint**
 - 每个节点保存 state，支持中断恢复
@@ -256,7 +283,7 @@
 
 **HITL**
 - 高风险节点必须人工确认
-- 低风险节点可自动生成草稿但仍需确认发送
+- 所有发送动作仍需用户确认
 
 ---
 
