@@ -2,8 +2,8 @@
 
 **目标**
 - 将 Dashboard 推荐/草稿/回复从内存改为数据库持久化
-- 保持现有 API 与前端协议不变
-- 支持最新 N 条聚合展示（默认 20）
+- 保持现有 API 与前端协议不变（字段不丢、不新增）
+- 支持最新 N 条聚合展示（默认 20，可配置）
 
 **范围**
 - 新增 Dashboard 相关实体与仓储
@@ -56,9 +56,30 @@
    - `next_action` (String)
    - `created_at` (Instant)
 
+**字段映射**
+- `RecommendationItem` → `dashboard_recommendations`
+  - `title` → `title`
+  - `company` → `company`
+  - `score` → `score`
+  - `reasons` → `reasons_json`（JSON 数组字符串）
+- `DraftItem` → `dashboard_drafts`
+  - `company` → `company`
+  - `title` → `title`
+  - `content` → `content`
+- `ReplyItem` → `dashboard_replies`
+  - `company` → `company`
+  - `intent` → `intent`
+  - `summary` → `summary`
+  - `nextAction` → `next_action`
+
+**ID 与时间**
+- `id` 使用 UUID 生成（在 `DashboardStore` 内生成）
+- `created_at` 使用 `Instant.now()` 写入，`@PrePersist` 兜底
+
 **排序与截断**
-- 仓储提供 `findTop20ByOrderByCreatedAtDesc()`
-- `DashboardStore` 只返回最近 N 条
+- 配置项：`job-agent.dashboard.max-items`，默认 20
+- 仓储使用 `Pageable` 按 `created_at` 倒序取 `N` 条
+- `DashboardStore.snapshot()` 仅返回最近 N 条
 
 ---
 
@@ -72,7 +93,9 @@
 ## 错误处理
 
 - `reasons_json` 解析失败时，回退为空列表
-- 任何 JSON 序列化失败不阻断主流程：存储空 `[]`
+- JSON 序列化失败不阻断主流程：存储空 `[]`
+- 数据库写入失败：记录日志，不抛出到控制器，主流程返回 `ok`
+- 数据库读取失败：返回空 `DashboardResponse`（指标为 0）
 
 ---
 
@@ -82,6 +105,7 @@
 - 新增 `DashboardStore` 单测：
   - `addRecommendation/addDraft/addReply` 后 `snapshot()` 计数正确
   - `snapshot()` 返回按 `created_at` 倒序
+  - `metrics.interviews` 统计 `intent=INTERVIEW` 的数量
 
 ---
 
