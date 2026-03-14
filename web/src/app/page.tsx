@@ -1,11 +1,14 @@
 import { fetchDashboard, fallbackDashboard } from "../lib/dashboard";
+import { fetchTasks } from "../lib/tasks";
 
 export default async function Home() {
   const dashboard = await fetchDashboard();
+  const tasks = await fetchTasks();
   const metrics = dashboard.metrics ?? fallbackDashboard.metrics;
   const recommendations = dashboard.recommendations ?? [];
   const drafts = dashboard.drafts ?? [];
   const replies = dashboard.replies ?? [];
+  const taskList = Array.isArray(tasks) ? tasks : [];
 
   const highlights = [
     { label: "今日新增岗位", value: String(metrics.recommendations) },
@@ -37,6 +40,17 @@ export default async function Home() {
   const displayRecommendations = hasRecommendations ? recommendations : fallbackRecommendations;
   const displayDrafts = hasDrafts ? drafts : fallbackDrafts;
   const displayReplies = hasReplies ? replies : fallbackReplies;
+  const displayTasks = taskList.length > 0
+    ? taskList
+    : [
+        {
+          task_id: "demo-task",
+          status: "ACTIVE",
+          target_role: "产品经理",
+          city: "上海",
+          salary: "20k-30k",
+        },
+      ];
 
   return (
     <main className="page">
@@ -122,6 +136,26 @@ export default async function Home() {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2>当前任务</h2>
+          <span className="pill">{displayTasks.length}</span>
+        </div>
+        <div className="list">
+          {displayTasks.map((task) => (
+            <div className="list-item compact" key={task.task_id ?? task.target_role}>
+              <div>
+                <p className="title">{task.target_role ?? "未命名任务"}</p>
+                <p className="muted">
+                  {task.city ?? "未知城市"} · {task.salary ?? "薪资未设定"}
+                </p>
+              </div>
+              <span className="tag">{task.status ?? "ACTIVE"}</span>
+            </div>
+          ))}
         </div>
       </section>
     </main>
