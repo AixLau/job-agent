@@ -1,33 +1,70 @@
 package com.jobagent.server.store;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.ResumeRequest;
 import com.jobagent.server.dto.ResumeResponse;
+import com.jobagent.server.repository.ResumeRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Component
 public class ResumeStore {
 
-    private final AtomicReference<ResumeResponse> current = new AtomicReference<>();
+    private static final Map<String, Object> EMPTY_PARSED = Map.of();
+
+    private final ResumeRepository repository;
+    private final ObjectMapper objectMapper;
+
+    public ResumeStore(ResumeRepository repository, ObjectMapper objectMapper) {
+        this.repository = repository;
+        this.objectMapper = objectMapper;
+    }
 
     public ResumeResponse save(ResumeRequest request) {
         String id = UUID.randomUUID().toString();
         Map<String, Object> parsed = request.parsedJson() == null
-            ? Map.of()
+            ? EMPTY_PARSED
             : request.parsedJson();
-        ResumeResponse response = new ResumeResponse(id, request.content(), parsed);
-        current.set(response);
-        return response;
+        String parsedJson = writeParsedJson(parsed);
+        ResumeEntity entity = new ResumeEntity(id, request.content(), parsedJson);
+        repository.save(entity);
+        return new ResumeResponse(id, request.content(), parsed);
     }
 
     public ResumeResponse latest() {
-        ResumeResponse response = current.get();
-        if (response == null) {
-            return new ResumeResponse("", "", Map.of());
+        return repository.findFirstByOrderByCreatedAtDesc()
+            .map(this::toResponse)
+            .orElseGet(() -> new ResumeResponse("", "", EMPTY_PARSED));
+    }
+
+    private ResumeResponse toResponse(ResumeEntity entity) {
+        return new ResumeResponse(
+            entity.getId(),
+            entity.getContent(),
+            readParsedJson(entity.getParsedJson())
+        );
+    }
+
+    private String writeParsedJson(Map<String, Object> parsed) {
+        try {
+            return objectMapper.writeValueAsString(parsed);
+        } catch (JsonProcessingException e) {
+            return "{}";
         }
-        return response;
+    }
+
+    private Map<String, Object> readParsedJson(String parsedJson) {
+        if (parsedJson == null || parsedJson.isBlank()) {
+            return EMPTY_PARSED;
+        }
+        try {
+            return objectMapper.readValue(parsedJson, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            return EMPTY_PARSED;
+        }
     }
 }

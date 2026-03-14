@@ -1,3 +1,12 @@
 spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
+  datasource:
+    url: ${JOB_AGENT_DB_URL:jdbc:h2:mem:jobagent;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}
+    username: ${JOB_AGENT_DB_USER:sa}
+    password: ${JOB_AGENT_DB_PASSWORD:}
+    driver-class-name: ${JOB_AGENT_DB_DRIVER:org.h2.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
