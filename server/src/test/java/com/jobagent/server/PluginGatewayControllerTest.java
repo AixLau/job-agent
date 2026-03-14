@@ -8,7 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(classes = JobAgentServerApplication.class)
@@ -24,7 +24,7 @@ class PluginGatewayControllerTest {
             {
               "task_id": "t1",
               "page_type": "list",
-              "raw_text": "raw",
+              "raw_text": "资深 产品 需要经验",
               "extracted_json": { "k": "v" },
               "source_url": "https://example.com",
               "dom_hash": "abc"
@@ -35,7 +35,10 @@ class PluginGatewayControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isOk())
-            .andExpect(content().json("{\"status\":\"ok\"}"));
+            .andExpect(jsonPath("$.status").value("ok"))
+            .andExpect(jsonPath("$.analysis.score").value(85))
+            .andExpect(jsonPath("$.analysis.reasons[0]").value("岗位匹配：产品相关"))
+            .andExpect(jsonPath("$.analysis.reasons[1]").value("匹配资深要求"));
     }
 
     @Test
@@ -45,7 +48,7 @@ class PluginGatewayControllerTest {
               "task_id": "t1",
               "conversation_id": "c1",
               "messages": [
-                { "id": "m1", "role": "hr", "text": "hello" }
+                { "id": "m1", "role": "hr", "text": "可以安排面试吗" }
               ],
               "last_message_id": "m1"
             }
@@ -55,7 +58,9 @@ class PluginGatewayControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isOk())
-            .andExpect(content().json("{\"status\":\"ok\"}"));
+            .andExpect(jsonPath("$.status").value("ok"))
+            .andExpect(jsonPath("$.reply.intent").value("INTERVIEW"))
+            .andExpect(jsonPath("$.reply.next_action").value("确认面试时间"));
     }
 
     @Test
@@ -73,7 +78,7 @@ class PluginGatewayControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isOk())
-            .andExpect(content().json("{\"status\":\"ok\"}"));
+            .andExpect(jsonPath("$.status").value("ok"));
     }
 
     @Test
@@ -92,6 +97,6 @@ class PluginGatewayControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isOk())
-            .andExpect(content().json("{\"status\":\"ok\"}"));
+            .andExpect(jsonPath("$.status").value("ok"));
     }
 }
