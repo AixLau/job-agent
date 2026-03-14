@@ -16,6 +16,22 @@
 
 ---
 
+## MVP 目标平台与页面类型
+
+**平台**
+- MVP 仅支持 Boss 直聘网页端（`zhipin.com`）
+
+**页面类型**
+- 职位列表页
+- 职位详情页
+- 聊天页（与 HR 对话）
+
+**抽取字段（最小）**
+- Job: `title`, `company`, `salary`, `experience`, `city`, `jd_raw`
+- Chat: `conversation_id`, `messages[{id,role,text,ts}]`
+
+---
+
 ## MVP 范围与边界
 
 **MVP In-Scope**
@@ -97,7 +113,7 @@
 - id, userId, strategyJson, automationLevel, status, createdAt
 
 **JobPost**
-- id, taskId, source, externalId, title, company, jdRaw, parsedJson, createdAt, status
+- id, taskId, source, externalId, title, company, salary, experience, city, jdRaw, parsedJson, createdAt, status
 
 **JobMatch**
 - id, taskId, jobPostId, score, reasonJson, riskTagsJson, createdAt
@@ -139,6 +155,12 @@
 - INTERVIEW（进入面试）
 - CLOSED（结束）
 
+**触发与责任方（摘要）**
+- 页面上报 → JobPost/JobMatch 写入（插件 + 服务端）
+- 草稿生成 → DRAFTED（服务端 + Worker）
+- 用户点击发送 → SENT（插件）
+- 聊天上报 → REPLIED/NEEDS_REPLY（插件 + Worker）
+
 ---
 
 ## API 设计（关键接口）
@@ -166,6 +188,31 @@
   请求：`HeartbeatRequest`
   响应：`StatusResponse`
 
+**请求 Schema（最小）**
+- `PageReportRequest`:
+  - `task_id` (string)
+  - `page_type` (list/detail)
+  - `raw_text` (string)
+  - `extracted_json` (object)
+  - `source_url` (string)
+  - `dom_hash` (string)
+- `ChatReportRequest`:
+  - `task_id` (string)
+  - `conversation_id` (string)
+  - `messages` (array)
+  - `last_message_id` (string)
+- `ActionReportRequest`:
+  - `task_id` (string)
+  - `action_type` (string)
+  - `status` (string)
+  - `payload` (object)
+- `HeartbeatRequest`:
+  - `user_id` (string)
+  - `task_id` (string)
+  - `tab_id` (string)
+  - `status` (string)
+  - `ts` (number)
+
 **错误处理（统一）**
 - 4xx：参数缺失/鉴权失败
 - 5xx：系统错误（记录审计）
@@ -187,9 +234,37 @@
 - 输入：Conversation + JobPost + Resume
 - 输出：MessageDraft + ReplyIntent + NextAction
 
+**服务端与 Worker 集成契约**
+- 调用方式：同步 HTTP（MVP）
+- 超时：10s
+- 重试：2 次
+- 幂等：基于 `task_id + external_id + stage`
+
 **Checkpoint**
 - 每个节点保存 state，支持中断恢复
 - 失败策略：节点级 retry（最多 2 次），失败后转 HITL
+
+---
+
+## 自动化等级与风控
+
+**低风险**
+- 匹配分 >= 70 且无风险标签
+
+**高风险**
+- 风险标签命中（outsourcing/overtime/grey）或匹配分 < 70
+
+**HITL**
+- 高风险节点必须人工确认
+- 低风险节点可自动生成草稿但仍需确认发送
+
+---
+
+## 去重与幂等策略
+
+- JobPost 去重：`source + external_id`
+- Conversation 去重：`task_id + conversation_id`
+- MessageDraft 去重：`conversation_id + source_type`
 
 ---
 
