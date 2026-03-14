@@ -1,27 +1,43 @@
-const highlights = [
-  { label: "今日新增岗位", value: "18" },
-  { label: "待发送草稿", value: "6" },
-  { label: "待处理回复", value: "3" },
-  { label: "面试邀约", value: "1" },
-];
+import { fetchDashboard, fallbackDashboard } from "../lib/dashboard";
 
-const recommendations = [
-  { title: "资深产品经理", company: "智聘科技", score: "86", note: "匹配度高，JD 清晰" },
-  { title: "B端产品负责人", company: "星火互娱", score: "82", note: "经验要求匹配" },
-  { title: "运营策略专家", company: "云图", score: "79", note: "薪资区间匹配" },
-];
+export default async function Home() {
+  const dashboard = await fetchDashboard();
+  const metrics = dashboard.metrics ?? fallbackDashboard.metrics;
+  const recommendations = dashboard.recommendations ?? [];
+  const drafts = dashboard.drafts ?? [];
+  const replies = dashboard.replies ?? [];
 
-const drafts = [
-  { company: "智聘科技", role: "资深产品经理", status: "待确认" },
-  { company: "星火互娱", role: "B端产品负责人", status: "待确认" },
-];
+  const highlights = [
+    { label: "今日新增岗位", value: String(metrics.recommendations) },
+    { label: "待发送草稿", value: String(metrics.drafts) },
+    { label: "待处理回复", value: String(metrics.replies) },
+    { label: "面试邀约", value: String(metrics.interviews) },
+  ];
 
-const replies = [
-  { company: "云图", intent: "面试邀约", time: "1小时前" },
-  { company: "山海数据", intent: "补充材料", time: "3小时前" },
-];
+  const hasRecommendations = recommendations.length > 0;
+  const hasDrafts = drafts.length > 0;
+  const hasReplies = replies.length > 0;
 
-export default function Home() {
+  const fallbackRecommendations = [
+    { title: "资深产品经理", company: "智聘科技", score: 86, reasons: ["匹配度高，JD 清晰"] },
+    { title: "B端产品负责人", company: "星火互娱", score: 82, reasons: ["经验要求匹配"] },
+    { title: "运营策略专家", company: "云图", score: 79, reasons: ["薪资区间匹配"] },
+  ];
+
+  const fallbackDrafts = [
+    { company: "智聘科技", title: "资深产品经理", content: "等待确认" },
+    { company: "星火互娱", title: "B端产品负责人", content: "等待确认" },
+  ];
+
+  const fallbackReplies = [
+    { company: "云图", intent: "面试邀约", summary: "1小时前" },
+    { company: "山海数据", intent: "补充材料", summary: "3小时前" },
+  ];
+
+  const displayRecommendations = hasRecommendations ? recommendations : fallbackRecommendations;
+  const displayDrafts = hasDrafts ? drafts : fallbackDrafts;
+  const displayReplies = hasReplies ? replies : fallbackReplies;
+
   return (
     <main className="page">
       <header className="topbar">
@@ -53,12 +69,14 @@ export default function Home() {
             <span className="pill">实时评分</span>
           </div>
           <div className="list">
-            {recommendations.map((item) => (
+            {displayRecommendations.map((item) => (
               <div className="list-item" key={item.title}>
                 <div>
                   <p className="title">{item.title}</p>
                   <p className="muted">{item.company}</p>
-                  <p className="hint">{item.note}</p>
+                  <p className="hint">
+                    {Array.isArray(item.reasons) ? item.reasons.join(" / ") : ""}
+                  </p>
                 </div>
                 <div className="score">{item.score}</div>
               </div>
@@ -70,16 +88,16 @@ export default function Home() {
           <div className="card">
             <div className="card-head">
               <h2>待发送草稿</h2>
-              <span className="pill">2</span>
+              <span className="pill">{metrics.drafts}</span>
             </div>
             <div className="list">
-              {drafts.map((item) => (
+              {displayDrafts.map((item) => (
                 <div className="list-item compact" key={item.company}>
                   <div>
                     <p className="title">{item.company}</p>
-                    <p className="muted">{item.role}</p>
+                    <p className="muted">{item.title}</p>
                   </div>
-                  <span className="tag">{item.status}</span>
+                  <span className="tag">待确认</span>
                 </div>
               ))}
             </div>
@@ -88,16 +106,18 @@ export default function Home() {
           <div className="card">
             <div className="card-head">
               <h2>待处理回复</h2>
-              <span className="pill warning">3</span>
+              <span className="pill warning">{metrics.replies}</span>
             </div>
             <div className="list">
-              {replies.map((item) => (
+              {displayReplies.map((item) => (
                 <div className="list-item compact" key={item.company}>
                   <div>
                     <p className="title">{item.company}</p>
                     <p className="muted">{item.intent}</p>
                   </div>
-                  <span className="tag ghost">{item.time}</span>
+                  <span className="tag ghost">
+                    {item.summary ?? "待处理"}
+                  </span>
                 </div>
               ))}
             </div>
