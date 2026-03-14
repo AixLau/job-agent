@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Job Agent",
+  "version": "0.1.0",
+  "description": "Job Agent MVP for Boss Zhipin",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://*.zhipin.com/*"],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "Job Agent",
+    "default_popup": "src/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.zhipin.com/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

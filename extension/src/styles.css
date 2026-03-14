@@ -1,0 +1,22 @@
+.popup {
+  min-width: 220px;
+  padding: 12px;
+  font-family: Arial, sans-serif;
+}
+
+.subtitle {
+  margin: 4px 0 12px;
+  color: #666;
+  font-size: 12px;
+}
+
+button {
+  width: 100%;
+  padding: 8px 10px;
+}
+
+.status {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #444;
+}
