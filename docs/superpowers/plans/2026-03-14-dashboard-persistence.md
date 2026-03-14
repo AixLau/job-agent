@@ -109,17 +109,21 @@ Expected: compilation errors for missing entities/repositories.
 - [ ] **Step 3: Implement entities (green)**
 
 Each entity should:
-- `@Entity` + `@Table(name = ...)`
+- `@Entity` + `@Table(name = ..., indexes = @Index(name = "...", columnList = "created_at"))`
 - `id` (String) as `@Id`
 - required fields as `@Column(nullable = false)`
+- explicit column names for snake_case fields: `created_at`, `reasons_json`, `next_action`
 - `createdAt` (Instant) with `@PrePersist` to set default
 - `content`/`summary`/`reasonsJson` use `columnDefinition = "text"`
+- add an additional constructor that accepts `Instant createdAt` for deterministic tests
 
 Example structure (apply per entity):
 
 ```java
 @Entity
-@Table(name = "dashboard_recommendations")
+@Table(name = "dashboard_recommendations", indexes = {
+    @Index(name = "idx_dashboard_recommendations_created_at", columnList = "created_at")
+})
 public class DashboardRecommendationEntity {
     @Id
     private String id;
@@ -133,10 +137,10 @@ public class DashboardRecommendationEntity {
     @Column(nullable = false)
     private int score;
 
-    @Column(nullable = false, columnDefinition = "text")
+    @Column(nullable = false, columnDefinition = "text", name = "reasons_json")
     private String reasonsJson;
 
-    @Column(nullable = false)
+    @Column(nullable = false, name = "created_at")
     private Instant createdAt;
 
     protected DashboardRecommendationEntity() {}
@@ -148,6 +152,15 @@ public class DashboardRecommendationEntity {
         this.score = score;
         this.reasonsJson = reasonsJson;
         this.createdAt = Instant.now();
+    }
+
+    public DashboardRecommendationEntity(String id, String title, String company, int score, String reasonsJson, Instant createdAt) {
+        this.id = id;
+        this.title = title;
+        this.company = company;
+        this.score = score;
+        this.reasonsJson = reasonsJson;
+        this.createdAt = createdAt;
     }
 
     @PrePersist
@@ -249,14 +262,32 @@ class DashboardStoreTest {
     private DashboardReplyRepository replyRepository;
 
     @Test
-    void snapshotReturnsLatestAndMetrics() throws InterruptedException {
+    void snapshotReturnsLatestAndMetrics() {
         store.addRecommendation(new RecommendationItem("A", "C1", 80, List.of("r1")));
-        Thread.sleep(5);
-        store.addRecommendation(new RecommendationItem("B", "C1", 81, List.of("r2")));
         store.addDraft(new DraftItem("C1", "A", "d1"));
         store.addReply(new ReplyItem("C1", "INTERVIEW", "s1", "n1"));
 
-        assertThat(recommendationRepository.count()).isEqualTo(2);
+        assertThat(recommendationRepository.count()).isEqualTo(1);
+        assertThat(draftRepository.count()).isEqualTo(1);
+        assertThat(replyRepository.count()).isEqualTo(1);
+
+        recommendationRepository.deleteAll();
+        recommendationRepository.save(new DashboardRecommendationEntity(
+            "rec-1",
+            "A",
+            "C1",
+            80,
+            "[\"r1\"]",
+            java.time.Instant.parse("2024-01-01T00:00:00Z")
+        ));
+        recommendationRepository.save(new DashboardRecommendationEntity(
+            "rec-2",
+            "B",
+            "C1",
+            81,
+            "[\"r2\"]",
+            java.time.Instant.parse("2024-01-02T00:00:00Z")
+        ));
 
         var snapshot = store.snapshot();
 
@@ -346,7 +377,7 @@ Error handling: JSON exceptions should return empty list/"[]". Database writes s
 
 - [ ] **Step 4: Update application.yml**
 
-Add config:
+Add config (and confirm `spring.jpa.hibernate.ddl-auto: update` is already present; add only if missing):
 
 ```yaml
 job-agent:
