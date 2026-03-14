@@ -101,6 +101,22 @@
 
 ---
 
+## 插件鉴权
+
+**认证接口**
+- `POST /api/auth/register` 账号注册
+- `POST /api/auth/login` 账号登录
+- `POST /api/auth/plugin/token` 签发插件 token
+- `POST /api/auth/plugin/refresh` 刷新插件 token
+- `POST /api/auth/plugin/revoke` 撤销插件 token
+
+**Token 规则**
+- `plugin_token` 绑定用户与浏览器实例
+- 有效期 24h
+- 支持刷新与撤销
+
+---
+
 ## 数据模型（核心实体）
 
 **User**
@@ -147,6 +163,7 @@
 - DRAFTED（首轮草稿生成）
 - SENT（用户确认发送）
 - REPLIED（收到 HR 回复）
+- INTERVIEW（进入面试）
 - ARCHIVED（用户忽略/不合适）
 
 **会话状态**
@@ -162,21 +179,12 @@
 - 页面上报 → JobPost/JobMatch 写入（插件 + 服务端）
 - 草稿生成 → DRAFTED（服务端 + Worker）
 - 用户点击发送 → SENT（插件）
-- 聊天上报 → REPLIED/NEEDS_REPLY（插件 + Worker）
+- 聊天上报 → REPLIED/NEEDS_REPLY/INTERVIEW（插件 + Worker）
 
 **状态映射**
 - Conversation 状态 = NEEDS_REPLY → JobPost 状态 = REPLIED
-- Conversation 状态 = INTERVIEW → JobPost 状态 = REPLIED
+- Conversation 状态 = INTERVIEW → JobPost 状态 = INTERVIEW
 - Conversation 状态 = CLOSED → JobPost 状态 = ARCHIVED
-
----
-
-## 插件鉴权
-
-- 插件首次登录获取 `plugin_token`
-- `plugin_token` 绑定用户与浏览器实例
-- 过期时间 24h，支持刷新
-- 可在服务端撤销
 
 ---
 
@@ -231,14 +239,16 @@
   - `ts` (number)
 
 **响应 Schema（最小）**
-- `PageReportResponse`: `status`, `analysis`, `draft`
-- `ChatReportResponse`: `status`, `reply`
+- `PageReportResponse`: `status`, `analysis{score,reasons,risks}`, `draft{company,title,content}`
+- `ChatReportResponse`: `status`, `reply{intent,summary,next_action}`
 - `StatusResponse`: `status`
 
-**错误处理（统一）**
-- 4xx：参数缺失/鉴权失败
-- 5xx：系统错误（记录审计）
-- 插件侧失败不阻断主流程，返回可解释错误码
+**工作台响应 Schema（最小）**
+- `DashboardResponse`:
+  - `metrics{recommendations,drafts,replies,interviews}`
+  - `recommendations[]`
+  - `drafts[]`
+  - `replies[]`
 
 ---
 
@@ -256,6 +266,17 @@
 - 输入：Conversation + JobPost + Resume + Messages
 - 输出：MessageDraft + ReplyIntent + NextAction
 
+**Worker API（最小）**
+- `POST /worker/job-match`
+  - req: `{task_id, job_post, resume, strategy}`
+  - resp: `{score, reasons[], risks[]}`
+- `POST /worker/draft`
+  - req: `{conversation, job_post, resume}`
+  - resp: `{content}`
+- `POST /worker/reply-classify`
+  - req: `{conversation, messages}`
+  - resp: `{intent, summary, next_action}`
+
 **服务端与 Worker 集成契约**
 - 调用方式：同步 HTTP（MVP）
 - 超时：10s
@@ -266,10 +287,6 @@
 - `JOB_MATCH`
 - `DRAFT`
 - `REPLY_CLASSIFY`
-
-**Checkpoint**
-- 每个节点保存 state，支持中断恢复
-- 失败策略：节点级 retry（最多 2 次），失败后转 HITL
 
 ---
 
