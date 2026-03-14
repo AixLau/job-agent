@@ -1,1 +1,4 @@
 .worktrees/
+.m2repo/
+**/target/
+**/__pycache__/
