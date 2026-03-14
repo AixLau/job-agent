@@ -185,7 +185,7 @@ public interface DashboardRecommendationRepository extends JpaRepository<Dashboa
 Also add query method per repository:
 
 ```java
-List<DashboardRecommendationEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
+List<DashboardRecommendationEntity> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -357,9 +357,9 @@ public class DashboardStore {
 
     public DashboardResponse snapshot() {
         Pageable page = PageRequest.of(0, maxItems, Sort.by("createdAt").descending());
-        var recs = recommendationRepository.findAllByOrderByCreatedAtDesc(page).stream()...
-        var drafts = draftRepository.findAllByOrderByCreatedAtDesc(page).stream()...
-        var replies = replyRepository.findAllByOrderByCreatedAtDesc(page).stream()...
+        var recs = recommendationRepository.findAllByOrderByCreatedAtDescIdDesc(page).stream()...
+        var drafts = draftRepository.findAllByOrderByCreatedAtDescIdDesc(page).stream()...
+        var replies = replyRepository.findAllByOrderByCreatedAtDescIdDesc(page).stream()...
 
         int interviews = (int) replies.stream().filter(r -> "INTERVIEW".equalsIgnoreCase(r.intent())).count();
         return new DashboardResponse(new DashboardMetrics(recs.size(), drafts.size(), replies.size(), interviews), recs, drafts, replies);

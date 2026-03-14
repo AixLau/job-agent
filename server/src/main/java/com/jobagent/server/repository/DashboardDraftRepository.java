@@ -8,5 +8,5 @@ import java.util.List;
 
 public interface DashboardDraftRepository extends JpaRepository<DashboardDraftEntity, String> {
 
-    List<DashboardDraftEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    List<DashboardDraftEntity> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
 }
