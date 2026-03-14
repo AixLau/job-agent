@@ -10,3 +10,7 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
+
+job-agent:
+  dashboard:
+    max-items: 20
