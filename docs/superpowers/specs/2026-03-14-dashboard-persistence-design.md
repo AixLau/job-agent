@@ -22,6 +22,7 @@
 **写入路径**
 - `PluginGatewayController` 处理 `page/report` 与 `chat/report`
 - `DashboardStore` 负责将 `RecommendationItem/DraftItem/ReplyItem` 写入数据库
+  - 每次请求最多生成 1 条推荐、1 条草稿、1 条回复（与现有逻辑一致）
 
 **读取路径**
 - `DashboardController` 调用 `DashboardStore.snapshot()`
@@ -80,6 +81,7 @@
 
 **排序与截断**
 - 配置项：`job-agent.dashboard.max-items`，默认 20
+- 配置来源：`application.yml` / 环境变量覆盖
 - 仓储使用 `Pageable` 按 `created_at` 倒序取 `N` 条
 - `DashboardStore.snapshot()` 仅返回最近 N 条
 
@@ -122,3 +124,7 @@
 
 **reasons_json 格式**
 - JSON 字符串，数组元素为字符串（与 `RecommendationItem.reasons` 一致）
+
+**索引建议**
+- `created_at` 索引（必要）
+- `intent` 可选索引（仅用于后续统计优化）
