@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Instant;
@@ -47,6 +48,8 @@ class DashboardStoreTest {
         assertThat(replyRepository.count()).isEqualTo(1);
 
         recommendationRepository.deleteAll();
+        draftRepository.deleteAll();
+        replyRepository.deleteAll();
         recommendationRepository.save(new DashboardRecommendationEntity(
             "rec-1",
             "A",
@@ -63,6 +66,36 @@ class DashboardStoreTest {
             "[\"r2\"]",
             Instant.parse("2024-01-02T00:00:00Z")
         ));
+        draftRepository.save(new DashboardDraftEntity(
+            "draft-1",
+            "C1",
+            "A",
+            "d1",
+            Instant.parse("2024-01-01T00:00:00Z")
+        ));
+        draftRepository.save(new DashboardDraftEntity(
+            "draft-2",
+            "C1",
+            "B",
+            "d2",
+            Instant.parse("2024-01-02T00:00:00Z")
+        ));
+        replyRepository.save(new DashboardReplyEntity(
+            "reply-1",
+            "C1",
+            "INTERVIEW",
+            "s1",
+            "n1",
+            Instant.parse("2024-01-01T00:00:00Z")
+        ));
+        replyRepository.save(new DashboardReplyEntity(
+            "reply-2",
+            "C1",
+            "INTERVIEW",
+            "s2",
+            "n2",
+            Instant.parse("2024-01-02T00:00:00Z")
+        ));
 
         var snapshot = store.snapshot();
 
@@ -71,6 +104,8 @@ class DashboardStoreTest {
         assertThat(snapshot.metrics().replies()).isEqualTo(1);
         assertThat(snapshot.metrics().interviews()).isEqualTo(1);
         assertThat(snapshot.recommendations().get(0).title()).isEqualTo("B");
+        assertThat(snapshot.drafts().get(0).title()).isEqualTo("B");
+        assertThat(snapshot.replies().get(0).summary()).isEqualTo("s2");
     }
 
     @org.springframework.boot.test.context.TestConfiguration
@@ -79,8 +114,10 @@ class DashboardStoreTest {
         DashboardStore dashboardStore(DashboardRecommendationRepository recommendationRepository,
                                       DashboardDraftRepository draftRepository,
                                       DashboardReplyRepository replyRepository,
-                                      ObjectMapper objectMapper) {
-            return new DashboardStore(recommendationRepository, draftRepository, replyRepository, objectMapper, 1);
+                                      ObjectMapper objectMapper,
+                                      Environment environment) {
+            int maxItems = Integer.parseInt(environment.getProperty("job-agent.dashboard.max-items", "20"));
+            return new DashboardStore(recommendationRepository, draftRepository, replyRepository, objectMapper, maxItems);
         }
 
         @Bean
