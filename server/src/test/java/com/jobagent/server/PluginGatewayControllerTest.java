@@ -280,6 +280,37 @@ class PluginGatewayControllerTest {
     }
 
     @Test
+    void page_report_rejects_invalid_job_match_output() throws Exception {
+        resetData();
+        seedTokenAndTask();
+
+        when(workerClient.jobMatch(any()))
+            .thenReturn(new WorkerJobMatchResponse(101, List.of(), List.of(), null));
+
+        String body = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "page_type", "list",
+            "raw_text", "raw",
+            "extracted_json", Map.of(
+                "source", "boss",
+                "external_id", "ext-invalid-match",
+                "title", "Role A",
+                "company", "Company A"
+            ),
+            "source_url", "https://example.com/job/invalid",
+            "dom_hash", "hash-invalid",
+            "want_draft", false
+        ));
+
+        mockMvc.perform(post("/plugin/page/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     void chat_and_action_report_ok() throws Exception {
         resetData();
         seedTokenAndTask();
@@ -329,6 +360,42 @@ class PluginGatewayControllerTest {
                 .content(actionBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ok"));
+    }
+
+    @Test
+    void chat_report_rejects_invalid_reply_output() throws Exception {
+        resetData();
+        seedTokenAndTask();
+
+        ConversationEntity conversation = new ConversationEntity(
+            UUID.randomUUID().toString(),
+            "task-1",
+            null,
+            "conv-invalid",
+            "NEW",
+            null,
+            null,
+            null,
+            null
+        );
+        conversationRepository.save(conversation);
+
+        when(workerClient.replyClassify(any()))
+            .thenReturn(new WorkerReplyClassifyResponse("UNKNOWN", "summary", ""));
+
+        String chatBody = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "conversation_id", "conv-invalid",
+            "messages", List.of(Map.of("id", "m1", "role", "hr", "text", "hello")),
+            "last_message_id", "m1"
+        ));
+
+        mockMvc.perform(post("/plugin/chat/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(chatBody))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
     @Test

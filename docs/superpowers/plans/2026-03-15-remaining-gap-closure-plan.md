@@ -266,7 +266,7 @@
 - [x] Step 3: 扩展审计存储结构与记录入口
 - [x] Step 4: 让审计页展示详细字段
 - [x] Step 5: 运行后端/Web 测试，确认通过
-- [ ] Step 6: 提交
+- [x] Step 6: 提交
 
 ### Task 6: Expand model output validation coverage
 
@@ -280,10 +280,10 @@
 - Test: `server/src/test/java/com/jobagent/server/service/RuleEngineServiceTest.java`
 - Test: `worker/tests/test_worker_api.py`
 
-- [ ] Step 1: 写失败测试，覆盖任务解析、岗位解析、回复分类、跟进建议、面试草稿的校验
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 补齐服务端和 worker 校验器
-- [ ] Step 4: 运行测试，确认通过
+- [x] Step 1: 写失败测试，覆盖任务解析、岗位解析、回复分类、跟进建议、面试草稿的校验
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 补齐服务端和 worker 校验器
+- [x] Step 4: 运行测试，确认通过
 - [ ] Step 5: 提交
 
 ---

@@ -12,6 +12,12 @@ from job_agent_worker.models import (
     ReplyClassifyRequest,
 )
 from job_agent_worker.task_parser import parse_task_strategy
+from job_agent_worker.validators import (
+    validate_draft_payload,
+    validate_job_match_payload,
+    validate_reply_payload,
+    validate_task_strategy,
+)
 
 app = FastAPI()
 
@@ -44,7 +50,9 @@ resume_parse_cache: Dict[str, Dict[str, Any]] = {}
 @app.post("/worker/goal-parse")
 def goal_parse(request: GoalParseRequest, _: str = Depends(require_worker_token)) -> Dict[str, Any]:
     def build() -> Dict[str, Any]:
-        return {"strategy_json": parse_task_strategy(request.strategy_text or "")}
+        strategy_json = parse_task_strategy(request.strategy_text or "")
+        validate_task_strategy(strategy_json)
+        return {"strategy_json": strategy_json}
 
     return cached_response(goal_parse_cache, request.idempotency_key, build)
 
@@ -72,8 +80,9 @@ def job_match(request: JobMatchRequest, _: str = Depends(require_worker_token)) 
             "risk_tags": risk_tags,
             "parsed_job": parsed_job,
         }
-
-    return cached_response(job_match_cache, request.idempotency_key, build)
+    response = cached_response(job_match_cache, request.idempotency_key, build)
+    validate_job_match_payload(response)
+    return response
 
 
 @app.post("/worker/draft")
@@ -88,8 +97,9 @@ def draft(request: DraftRequest, _: str = Depends(require_worker_token)) -> Dict
         if str(conversation.get("intent") or "").upper() == "INTERVIEW":
             payload["interview_draft"] = f"你好，我已收到{company}{title}岗位的面试邀约，可以配合确认时间。"
         return payload
-
-    return cached_response(draft_cache, request.idempotency_key, build)
+    response = cached_response(draft_cache, request.idempotency_key, build)
+    validate_draft_payload(response)
+    return response
 
 
 @app.post("/worker/reply-classify")
@@ -107,8 +117,9 @@ def reply_classify(
             summary = "需要跟进对话"
             next_action = "继续沟通"
         return {"intent": intent, "summary": summary, "next_action": next_action}
-
-    return cached_response(reply_cache, request.idempotency_key, build)
+    response = cached_response(reply_cache, request.idempotency_key, build)
+    validate_reply_payload(response)
+    return response
 
 
 @app.post("/worker/resume-parse")

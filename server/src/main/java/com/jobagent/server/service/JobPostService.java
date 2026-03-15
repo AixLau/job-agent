@@ -137,6 +137,7 @@ public class JobPostService {
         }
 
         WorkerJobMatchResponse matchResponse = callJobMatch(task, post, resume, extracted);
+        validator.validateJobMatch(matchResponse);
         int score = matchResponse.score() == null ? 0 : matchResponse.score();
         RuleResult.ParsedRange parsedRange = ruleEngineService.resolveParsedRange(
             matchResponse.parsedJob(),

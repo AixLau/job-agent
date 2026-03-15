@@ -117,6 +117,7 @@ public class ConversationService {
         persistMessages(conversation.getId(), request.messages());
 
         WorkerReplyClassifyResponse response = callReplyClassify(request, conversation);
+        validator.validateReplyClassify(response);
         try {
             validator.validateSummary(response.summary());
         } catch (ValidationException ex) {
