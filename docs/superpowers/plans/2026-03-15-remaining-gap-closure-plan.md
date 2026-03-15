@@ -284,7 +284,7 @@
 - [x] Step 2: 运行测试，确认失败
 - [x] Step 3: 补齐服务端和 worker 校验器
 - [x] Step 4: 运行测试，确认通过
-- [ ] Step 5: 提交
+- [x] Step 5: 提交
 
 ---
 
@@ -364,11 +364,11 @@
 - Test: `web/tests/recommendations.test.mjs`
 - Test: `web/tests/settings.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖页面数据加载、空态与错误态
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 实现推荐岗位页、任务详情页、设置页
-- [ ] Step 4: 把首页跳转入口补齐
-- [ ] Step 5: 运行测试，确认通过
+- [x] Step 1: 写失败测试，覆盖页面数据加载、空态与错误态
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 实现推荐岗位页、任务详情页、设置页
+- [x] Step 4: 把首页跳转入口补齐
+- [x] Step 5: 运行测试，确认通过
 - [ ] Step 6: 提交
 
 ### Task 11: Improve recommendation explainability
@@ -383,11 +383,11 @@
 - Create: `web/tests/recommendations.test.mjs`
 - Test: `server/src/test/java/com/jobagent/server/DashboardControllerTest.java`
 
-- [ ] Step 1: 写失败测试，覆盖推荐理由、过滤原因、风险提示完整展示
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 补齐 server DTO 与 dashboard 数据
-- [ ] Step 4: 补齐首页和推荐页的解释性展示
-- [ ] Step 5: 运行测试，确认通过
+- [x] Step 1: 写失败测试，覆盖推荐理由、过滤原因、风险提示完整展示
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 补齐 server DTO 与 dashboard 数据
+- [x] Step 4: 补齐首页和推荐页的解释性展示
+- [x] Step 5: 运行测试，确认通过
 - [ ] Step 6: 提交
 
 ---

@@ -34,6 +34,9 @@ public class DashboardRecommendationEntity {
     @Column(nullable = false)
     private int score;
 
+    @Column(name = "reasons_json", nullable = false, columnDefinition = "text")
+    private String reasonsJson;
+
     @Column(name = "risks_json", nullable = false, columnDefinition = "text")
     private String risksJson;
 
@@ -52,9 +55,10 @@ public class DashboardRecommendationEntity {
                                          String title,
                                          String company,
                                          int score,
+                                         String reasonsJson,
                                          String risksJson,
                                          String status) {
-        this(id, userId, jobPostId, title, company, score, risksJson, status, Instant.now());
+        this(id, userId, jobPostId, title, company, score, reasonsJson, risksJson, status, Instant.now());
     }
 
     public DashboardRecommendationEntity(String id,
@@ -63,6 +67,7 @@ public class DashboardRecommendationEntity {
                                          String title,
                                          String company,
                                          int score,
+                                         String reasonsJson,
                                          String risksJson,
                                          String status,
                                          Instant createdAt) {
@@ -72,6 +77,7 @@ public class DashboardRecommendationEntity {
         this.title = title;
         this.company = company;
         this.score = score;
+        this.reasonsJson = reasonsJson;
         this.risksJson = risksJson;
         this.status = status;
         this.createdAt = createdAt;
@@ -110,6 +116,10 @@ public class DashboardRecommendationEntity {
 
     public String getRisksJson() {
         return risksJson;
+    }
+
+    public String getReasonsJson() {
+        return reasonsJson;
     }
 
     public String getStatus() {

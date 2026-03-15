@@ -181,6 +181,7 @@ public class JobPostService {
             defaultString(post.getTitle(), "未命名岗位"),
             defaultString(post.getCompany(), "未知公司"),
             analysis.score(),
+            analysis.reasons(),
             analysis.riskTags(),
             post.getStatus()
         );

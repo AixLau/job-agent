@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { fetchDashboard, fallbackDashboard } from "../lib/dashboard";
 import { blacklistCompany, followJob, ignoreJob } from "../lib/jobActions";
@@ -147,6 +148,22 @@ export default function Home() {
       </header>
 
       <section className="grid highlights">
+        {[
+          ["/recommendations", "推荐页"],
+          ["/replies", "回复页"],
+          ["/interviews", "面试页"],
+          ["/follows", "关注列表"],
+          ["/tasks", "任务页"],
+          ["/settings", "设置页"],
+        ].map(([href, label]) => (
+          <Link className="card metric" href={href} key={href}>
+            <p className="label">入口</p>
+            <h3>{label}</h3>
+          </Link>
+        ))}
+      </section>
+
+      <section className="grid highlights">
         {highlights.map((item) => (
           <div className="card metric" key={item.label}>
             <p className="label">{item.label}</p>
@@ -167,6 +184,11 @@ export default function Home() {
                 <div>
                   <p className="title">{item.title}</p>
                   <p className="muted">{item.company}</p>
+                  <p className="muted">
+                    {Array.isArray(item.reasons) && item.reasons.length > 0
+                      ? item.reasons.join(" / ")
+                      : "暂无推荐理由"}
+                  </p>
                   <p className="hint">
                     {Array.isArray(item.risks) ? item.risks.join(" / ") : ""}
                   </p>
@@ -248,7 +270,9 @@ export default function Home() {
           {displayTasks.map((task) => (
             <div className="list-item compact" key={task.id ?? task.title}>
               <div>
-                <p className="title">{task.title ?? "未命名任务"}</p>
+                <p className="title">
+                  {task.id ? <Link href={`/tasks/${task.id}`}>{task.title ?? "未命名任务"}</Link> : task.title ?? "未命名任务"}
+                </p>
                 <p className="muted">
                   {task.city ?? "未知城市"} · {task.salary ?? "薪资未设定"}
                 </p>

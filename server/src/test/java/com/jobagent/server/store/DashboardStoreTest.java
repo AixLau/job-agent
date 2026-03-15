@@ -47,7 +47,7 @@ class DashboardStoreTest {
 
     @Test
     void snapshotReturnsLatestAndMetrics() {
-        store.addRecommendation("user-1", new RecommendationItem("job-1", "A", "C1", 80, List.of("r1"), "ACTIVE"));
+        store.addRecommendation("user-1", new RecommendationItem("job-1", "A", "C1", 80, List.of("理由1"), List.of("r1"), "ACTIVE"));
         store.addDraft("user-1", new DraftItem("draft-1", "conv-1", "d1", Instant.now(), false));
         store.addReply("user-1", new ReplyItem("conv-1", "s1", "INTERVIEW", Instant.now()));
 
@@ -65,6 +65,7 @@ class DashboardStoreTest {
             "A",
             "C1",
             80,
+            "[\"理由1\"]",
             "[\"r1\"]",
             "ACTIVE",
             Instant.parse("2024-01-01T00:00:00Z")
@@ -76,6 +77,7 @@ class DashboardStoreTest {
             "B",
             "C1",
             81,
+            "[\"理由2\"]",
             "[\"r2\"]",
             "ACTIVE",
             Instant.parse("2024-01-02T00:00:00Z")
@@ -147,6 +149,7 @@ class DashboardStoreTest {
         assertThat(snapshot.metrics().replies()).isEqualTo(1);
         assertThat(snapshot.metrics().interviews()).isEqualTo(1);
         assertThat(snapshot.recommendations().get(0).title()).isEqualTo("B");
+        assertThat(snapshot.recommendations().get(0).reasons()).containsExactly("理由2");
         assertThat(snapshot.drafts().get(0).conversationId()).isEqualTo("conv-2");
         assertThat(snapshot.drafts().get(0).jobPostId()).isEqualTo("job-2");
         assertThat(snapshot.drafts().get(0).company()).isEqualTo("Company B");

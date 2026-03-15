@@ -54,6 +54,7 @@ public class DashboardStore {
     }
 
     public void addRecommendation(String userId, RecommendationItem item) {
+        String reasonsJson = writeList(item.reasons());
         String risksJson = writeRisks(item.risks());
         DashboardRecommendationEntity entity = new DashboardRecommendationEntity(
             UUID.randomUUID().toString(),
@@ -62,6 +63,7 @@ public class DashboardStore {
             item.title(),
             item.company(),
             item.score(),
+            reasonsJson,
             risksJson,
             item.status()
         );
@@ -186,6 +188,7 @@ public class DashboardStore {
             entity.getTitle(),
             entity.getCompany(),
             entity.getScore(),
+            readList(entity.getReasonsJson()),
             readRisks(entity.getRisksJson()),
             entity.getStatus()
         );
@@ -235,20 +238,28 @@ public class DashboardStore {
     }
 
     private String writeRisks(List<String> risks) {
-        List<String> safeRisks = risks == null ? EMPTY_REASONS : risks;
+        return writeList(risks);
+    }
+
+    private String writeList(List<String> values) {
+        List<String> safeValues = values == null ? EMPTY_REASONS : values;
         try {
-            return objectMapper.writeValueAsString(safeRisks);
+            return objectMapper.writeValueAsString(safeValues);
         } catch (JsonProcessingException ex) {
             return "[]";
         }
     }
 
     private List<String> readRisks(String risksJson) {
-        if (risksJson == null || risksJson.isBlank()) {
+        return readList(risksJson);
+    }
+
+    private List<String> readList(String json) {
+        if (json == null || json.isBlank()) {
             return EMPTY_REASONS;
         }
         try {
-            return objectMapper.readValue(risksJson, new TypeReference<>() {});
+            return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (JsonProcessingException ex) {
             return EMPTY_REASONS;
         }

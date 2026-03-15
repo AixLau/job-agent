@@ -15,6 +15,7 @@ export const fallbackDashboard = {
 const normalizeRecommendation = (item) => ({
   ...item,
   jobPostId: item.jobPostId ?? item.job_post_id ?? "",
+  reasons: Array.isArray(item.reasons) ? item.reasons : [],
 });
 
 const normalizeDraft = (item) => ({

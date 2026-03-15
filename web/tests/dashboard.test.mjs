@@ -29,6 +29,7 @@ test("fetchDashboard sends auth header and normalizes response body", async () =
             title: "Title",
             company: "Company",
             score: 80,
+            reasons: ["匹配：产品相关"],
             risks: ["risk"],
             status: "ACTIVE",
           },
@@ -67,6 +68,7 @@ test("fetchDashboard sends auth header and normalizes response body", async () =
     assert.equal(data.metrics.recommendations, 1);
     assert.equal(data.updatedAt, "2024-01-01T00:00:00Z");
     assert.equal(data.recommendations[0].jobPostId, "job-1");
+    assert.deepEqual(data.recommendations[0].reasons, ["匹配：产品相关"]);
     assert.equal(data.drafts[0].draftId, "draft-1");
     assert.equal(data.drafts[0].conversationId, "conv-1");
     assert.equal(data.drafts[0].createdAt, "2024-01-01T00:00:00Z");

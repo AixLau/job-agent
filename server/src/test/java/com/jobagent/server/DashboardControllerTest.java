@@ -99,6 +99,7 @@ class DashboardControllerTest {
             "Role A",
             "Company A",
             80,
+            List.of("匹配：产品相关"),
             List.of("risk1"),
             "SHORTLISTED"
         ));
@@ -124,6 +125,7 @@ class DashboardControllerTest {
             .andExpect(jsonPath("$.metrics.replies").value(1))
             .andExpect(jsonPath("$.metrics.interviews").value(1))
             .andExpect(jsonPath("$.recommendations[0].job_post_id").value("job-1"))
+            .andExpect(jsonPath("$.recommendations[0].reasons[0]").value("匹配：产品相关"))
             .andExpect(jsonPath("$.drafts[0].draft_id").value("draft-1"))
             .andExpect(jsonPath("$.drafts[0].job_post_id").value("job-1"))
             .andExpect(jsonPath("$.drafts[0].company").value("Company A"))
@@ -161,6 +163,7 @@ class DashboardControllerTest {
             "Role Archived",
             "Company A",
             80,
+            List.of("匹配：产品相关"),
             List.of("risk1"),
             "SHORTLISTED"
         ));
