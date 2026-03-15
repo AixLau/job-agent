@@ -134,10 +134,17 @@ public class JobPostService {
 
         WorkerJobMatchResponse matchResponse = callJobMatch(task, post, resume, extracted);
         int score = matchResponse.score() == null ? 0 : matchResponse.score();
-        RuleResult ruleResult = ruleEngineService.evaluate(
+        RuleResult.ParsedRange parsedRange = ruleEngineService.resolveParsedRange(
+            matchResponse.parsedJob(),
+            valueOf(extracted, "salary"),
+            valueOf(extracted, "experience"),
+            request.rawText()
+        );
+        RuleResult ruleResult = ruleEngineService.evaluateWithParsedRange(
             request.rawText(),
             task.getRuleConfigJson(),
-            safeList(matchResponse.risks())
+            safeList(matchResponse.risks()),
+            parsedRange
         );
         List<String> finalRiskTags = safeList(ruleResult.riskTags());
         JobMatchEntity match = new JobMatchEntity(

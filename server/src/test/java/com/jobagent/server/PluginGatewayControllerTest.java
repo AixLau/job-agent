@@ -108,7 +108,7 @@ class PluginGatewayControllerTest {
         seedTokenAndTask();
 
         when(workerClient.jobMatch(any()))
-            .thenReturn(new WorkerJobMatchResponse(80, List.of("r1"), List.of("risk1")));
+            .thenReturn(new WorkerJobMatchResponse(80, List.of("r1"), List.of("risk1"), null));
         when(workerClient.buildDraft(any()))
             .thenReturn(new WorkerDraftResponse("draft text"));
 
@@ -166,7 +166,7 @@ class PluginGatewayControllerTest {
         ));
 
         when(workerClient.jobMatch(any()))
-            .thenReturn(new WorkerJobMatchResponse(60, List.of("r1"), List.of("risk1")));
+            .thenReturn(new WorkerJobMatchResponse(60, List.of("r1"), List.of("risk1"), null));
 
         String body = mapper.writeValueAsString(Map.of(
             "task_id", "task-1",

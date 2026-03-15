@@ -3,6 +3,7 @@ package com.jobagent.server.service;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class RuleEngineService {
@@ -55,6 +56,38 @@ public class RuleEngineService {
         return evaluate(text, config.salary(), config.experience(), config.automationLevel(), workerTags);
     }
 
+    public RuleResult evaluateWithParsedRange(String text,
+                                              String ruleConfigJson,
+                                              List<String> workerTags,
+                                              RuleResult.ParsedRange parsedRange) {
+        RuleConfigParser.RuleConfig config = ruleConfigParser.parse(ruleConfigJson);
+        List<String> riskTags = unionTags(riskRuleSet.match(text), workerTags);
+        RuleResult.AutomationAction action = automationPolicy.evaluate(config.automationLevel(), riskTags);
+        return new RuleResult(true, riskTags, action, parsedRange);
+    }
+
+    public RuleResult.ParsedRange resolveParsedRange(Map<String, Object> parsedJob,
+                                                     String salaryText,
+                                                     String experienceText,
+                                                     String rawText) {
+        if (parsedJob != null && !parsedJob.isEmpty()) {
+            RuleResult.Range salary = new RuleResult.Range(
+                readInt(parsedJob, "salary_min", "salaryMin"),
+                readInt(parsedJob, "salary_max", "salaryMax")
+            );
+            RuleResult.Range experience = new RuleResult.Range(
+                readInt(parsedJob, "experience_min", "experienceMin"),
+                readInt(parsedJob, "experience_max", "experienceMax")
+            );
+            return new RuleResult.ParsedRange(salary, experience);
+        }
+        String salarySource = firstNonBlank(salaryText, rawText);
+        String experienceSource = firstNonBlank(experienceText, rawText);
+        RuleResult.Range salary = salaryParser.parse(salarySource);
+        RuleResult.Range experience = experienceParser.parse(experienceSource);
+        return new RuleResult.ParsedRange(salary, experience);
+    }
+
     private List<String> unionTags(List<String> primary, List<String> secondary) {
         if ((primary == null || primary.isEmpty()) && (secondary == null || secondary.isEmpty())) {
             return List.of();
@@ -67,5 +100,37 @@ public class RuleEngineService {
             merged.addAll(secondary);
         }
         return List.copyOf(merged);
+    }
+
+    private Integer readInt(Map<String, Object> data, String primaryKey, String fallbackKey) {
+        Object value = data.get(primaryKey);
+        if (value == null && fallbackKey != null) {
+            value = data.get(fallbackKey);
+        }
+        return toInt(value);
+    }
+
+    private Integer toInt(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        if (fallback != null && !fallback.isBlank()) {
+            return fallback;
+        }
+        return "";
     }
 }
