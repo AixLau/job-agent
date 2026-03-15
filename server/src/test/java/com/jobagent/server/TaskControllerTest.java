@@ -5,10 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.repository.AuditLogRepository;
 import com.jobagent.server.repository.TaskRepository;
 import com.jobagent.server.repository.UserRepository;
+import com.jobagent.server.service.StrategyService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -40,6 +44,15 @@ class TaskControllerTest {
 
     @Autowired
     private AuditLogRepository auditLogRepository;
+
+    @MockBean
+    private StrategyService strategyService;
+
+    @BeforeEach
+    void stubStrategyService() {
+        Mockito.when(strategyService.parse(Mockito.anyString(), Mockito.anyString()))
+            .thenAnswer(invocation -> "{\"goal\":\"" + invocation.getArgument(0) + "\"}");
+    }
 
     @Test
     void create_task_returns_task_response() throws Exception {
@@ -117,6 +130,67 @@ class TaskControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.task.title").value("Role A Updated"))
             .andExpect(jsonPath("$.task.strategy_json").value("{\"goal\":\"new strategy\"}"));
+    }
+
+    @Test
+    void patch_task_updates_status() throws Exception {
+        auditLogRepository.deleteAll();
+        taskRepository.deleteAll();
+        userRepository.deleteAll();
+
+        String accessToken = registerAndLogin("alice");
+
+        String createResponse = createTask(accessToken, "Role A");
+        Map<String, Object> createPayload = mapper.readValue(createResponse, new TypeReference<>() {});
+        Map<String, Object> task = (Map<String, Object>) createPayload.get("task");
+        String taskId = (String) task.get("id");
+
+        String patchBody = mapper.writeValueAsString(Map.of(
+            "status", "PAUSED"
+        ));
+
+        mockMvc.perform(patch("/api/tasks/" + taskId)
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(patchBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.task.status").value("PAUSED"));
+    }
+
+    @Test
+    void patch_task_rejects_invalid_status() throws Exception {
+        auditLogRepository.deleteAll();
+        taskRepository.deleteAll();
+        userRepository.deleteAll();
+
+        String accessToken = registerAndLogin("alice");
+
+        String createResponse = createTask(accessToken, "Role A");
+        Map<String, Object> createPayload = mapper.readValue(createResponse, new TypeReference<>() {});
+        Map<String, Object> task = (Map<String, Object>) createPayload.get("task");
+        String taskId = (String) task.get("id");
+
+        String patchBody = mapper.writeValueAsString(Map.of(
+            "status", "INVALID"
+        ));
+
+        mockMvc.perform(patch("/api/tasks/" + taskId)
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(patchBody))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void patch_task_status_requires_authorization() throws Exception {
+        String patchBody = mapper.writeValueAsString(Map.of(
+            "status", "PAUSED"
+        ));
+
+        mockMvc.perform(patch("/api/tasks/t-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(patchBody))
+            .andExpect(status().isUnauthorized());
     }
 
     @Test

@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -77,6 +78,13 @@ public class TaskStore {
         }
         if (request.experience() != null) {
             entity.setExperience(request.experience());
+        }
+        if (request.status() != null) {
+            String normalizedStatus = request.status().toUpperCase(Locale.ROOT);
+            if (!isAllowedStatus(normalizedStatus)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid status");
+            }
+            entity.setStatus(normalizedStatus);
         }
         if (request.automationLevel() != null) {
             entity.setAutomationLevel(request.automationLevel());
@@ -156,10 +164,16 @@ public class TaskStore {
             payload.put("automationLevel", resolvedAutomation);
         }
         try {
-            return mapper.writeValueAsString(payload);
-        } catch (Exception ex) {
-            return "{}";
-        }
+        return mapper.writeValueAsString(payload);
+    } catch (Exception ex) {
+        return "{}";
+    }
+}
+
+    private boolean isAllowedStatus(String status) {
+        return "PAUSED".equals(status)
+            || "COMPLETED".equals(status)
+            || "FAILED".equals(status);
     }
 
     private String firstNonBlank(String primary, String fallback) {

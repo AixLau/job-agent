@@ -9,6 +9,7 @@ public record TaskUpdateRequest(
     String experience,
     List<String> exclude,
     List<String> preferences,
+    String status,
     String automationLevel,
     String strategyText
 ) {}
