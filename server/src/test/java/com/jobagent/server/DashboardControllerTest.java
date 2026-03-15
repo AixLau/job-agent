@@ -125,7 +125,11 @@ class DashboardControllerTest {
             .andExpect(jsonPath("$.metrics.interviews").value(1))
             .andExpect(jsonPath("$.recommendations[0].job_post_id").value("job-1"))
             .andExpect(jsonPath("$.drafts[0].draft_id").value("draft-1"))
+            .andExpect(jsonPath("$.drafts[0].job_post_id").value("job-1"))
+            .andExpect(jsonPath("$.drafts[0].company").value("Company A"))
             .andExpect(jsonPath("$.replies[0].conversation_id").value("conv-1"))
+            .andExpect(jsonPath("$.replies[0].job_post_id").value("job-1"))
+            .andExpect(jsonPath("$.replies[0].company").value("Company A"))
             .andExpect(jsonPath("$.interviews[0].conversation_id").value("conv-1"))
             .andExpect(jsonPath("$.updated_at").exists());
     }

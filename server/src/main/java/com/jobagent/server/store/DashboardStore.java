@@ -191,9 +191,21 @@ public class DashboardStore {
     }
 
     private DraftItem toDraft(DashboardDraftEntity entity) {
+        String jobPostId = null;
+        String company = null;
+        var conversation = conversationRepository.findById(entity.getConversationId()).orElse(null);
+        if (conversation != null && conversation.getJobPostId() != null) {
+            jobPostId = conversation.getJobPostId();
+            var post = jobPostRepository.findById(jobPostId).orElse(null);
+            if (post != null) {
+                company = post.getCompany();
+            }
+        }
         return new DraftItem(
             entity.getId(),
             entity.getConversationId(),
+            jobPostId,
+            company,
             entity.getContent(),
             entity.getCreatedAt(),
             entity.isApproved()
@@ -201,8 +213,20 @@ public class DashboardStore {
     }
 
     private ReplyItem toReply(DashboardReplyEntity entity) {
+        String jobPostId = null;
+        String company = null;
+        var conversation = conversationRepository.findById(entity.getConversationId()).orElse(null);
+        if (conversation != null && conversation.getJobPostId() != null) {
+            jobPostId = conversation.getJobPostId();
+            var post = jobPostRepository.findById(jobPostId).orElse(null);
+            if (post != null) {
+                company = post.getCompany();
+            }
+        }
         return new ReplyItem(
             entity.getConversationId(),
+            jobPostId,
+            company,
             entity.getSummary(),
             entity.getIntent(),
             entity.getUpdatedAt()

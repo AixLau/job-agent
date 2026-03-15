@@ -148,7 +148,11 @@ class DashboardStoreTest {
         assertThat(snapshot.metrics().interviews()).isEqualTo(1);
         assertThat(snapshot.recommendations().get(0).title()).isEqualTo("B");
         assertThat(snapshot.drafts().get(0).conversationId()).isEqualTo("conv-2");
+        assertThat(snapshot.drafts().get(0).jobPostId()).isEqualTo("job-2");
+        assertThat(snapshot.drafts().get(0).company()).isEqualTo("Company B");
         assertThat(snapshot.replies().get(0).summary()).isEqualTo("s2");
+        assertThat(snapshot.replies().get(0).jobPostId()).isEqualTo("job-2");
+        assertThat(snapshot.replies().get(0).company()).isEqualTo("Company B");
         assertThat(snapshot.interviews().get(0).company()).isEqualTo("Company B");
         assertThat(snapshot.interviews().get(0).title()).isEqualTo("Title B");
     }
