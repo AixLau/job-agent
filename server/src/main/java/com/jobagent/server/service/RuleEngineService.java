@@ -50,6 +50,11 @@ public class RuleEngineService {
         return evaluate(text, config.salary(), config.experience(), config.automationLevel(), List.of());
     }
 
+    public RuleResult evaluate(String text, String ruleConfigJson, List<String> workerTags) {
+        RuleConfigParser.RuleConfig config = ruleConfigParser.parse(ruleConfigJson);
+        return evaluate(text, config.salary(), config.experience(), config.automationLevel(), workerTags);
+    }
+
     private List<String> unionTags(List<String> primary, List<String> secondary) {
         if ((primary == null || primary.isEmpty()) && (secondary == null || secondary.isEmpty())) {
             return List.of();

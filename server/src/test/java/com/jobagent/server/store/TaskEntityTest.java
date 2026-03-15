@@ -12,6 +12,7 @@ class TaskEntityTest {
     @Test
     void json_fields_are_lob() throws Exception {
         assertThat(hasLob("strategyJson")).isTrue();
+        assertThat(hasLob("ruleConfigJson")).isTrue();
         assertThat(hasLob("excludeJson")).isTrue();
         assertThat(hasLob("preferencesJson")).isTrue();
     }

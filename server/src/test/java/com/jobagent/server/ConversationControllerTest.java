@@ -67,6 +67,7 @@ class ConversationControllerTest {
             "SEMI",
             "ACTIVE",
             "{\"goal\":\"x\"}",
+            "{}",
             "[]",
             "[]",
             Instant.now()

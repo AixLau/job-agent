@@ -52,6 +52,7 @@ public class JobPostService {
     private final TaskRepository taskRepository;
     private final ResumeRepository resumeRepository;
     private final WorkerClient workerClient;
+    private final RuleEngineService ruleEngineService;
     private final ModelOutputValidator validator;
     private final DuplicatePayloadBuilder duplicatePayloadBuilder;
     private final DashboardStore dashboardStore;
@@ -64,6 +65,7 @@ public class JobPostService {
                           TaskRepository taskRepository,
                           ResumeRepository resumeRepository,
                           WorkerClient workerClient,
+                          RuleEngineService ruleEngineService,
                           ModelOutputValidator validator,
                           DuplicatePayloadBuilder duplicatePayloadBuilder,
                           DashboardStore dashboardStore,
@@ -75,6 +77,7 @@ public class JobPostService {
         this.taskRepository = taskRepository;
         this.resumeRepository = resumeRepository;
         this.workerClient = workerClient;
+        this.ruleEngineService = ruleEngineService;
         this.validator = validator;
         this.duplicatePayloadBuilder = duplicatePayloadBuilder;
         this.dashboardStore = dashboardStore;
@@ -131,13 +134,20 @@ public class JobPostService {
 
         WorkerJobMatchResponse matchResponse = callJobMatch(task, post, resume, extracted);
         int score = matchResponse.score() == null ? 0 : matchResponse.score();
+        RuleResult ruleResult = ruleEngineService.evaluate(
+            request.rawText(),
+            task.getRuleConfigJson(),
+            safeList(matchResponse.risks())
+        );
+        List<String> finalRiskTags = safeList(ruleResult.riskTags());
         JobMatchEntity match = new JobMatchEntity(
             UUID.randomUUID().toString(),
             request.taskId(),
             post.getId(),
             score,
             writeJson(matchResponse.reasons()),
-            writeJson(matchResponse.risks()),
+            writeJson(finalRiskTags),
+            writeJson(ruleResult),
             null
         );
         jobMatchRepository.save(match);
@@ -149,7 +159,7 @@ public class JobPostService {
         }
         jobPostRepository.save(post);
 
-        AnalysisResult analysis = new AnalysisResult(score, safeList(matchResponse.reasons()), safeList(matchResponse.risks()));
+        AnalysisResult analysis = new AnalysisResult(score, safeList(matchResponse.reasons()), finalRiskTags);
         RecommendationItem recommendation = new RecommendationItem(
             post.getId(),
             defaultString(post.getTitle(), "未命名岗位"),

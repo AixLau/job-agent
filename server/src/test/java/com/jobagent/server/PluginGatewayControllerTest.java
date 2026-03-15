@@ -159,6 +159,7 @@ class PluginGatewayControllerTest {
             "SEMI",
             "ACTIVE",
             "{\"goal\":\"x\"}",
+            "{}",
             "[]",
             "[]",
             Instant.now()
@@ -312,6 +313,7 @@ class PluginGatewayControllerTest {
             "SEMI",
             "ACTIVE",
             "{\"goal\":\"x\"}",
+            "{}",
             "[]",
             "[]",
             Instant.now()
@@ -376,6 +378,7 @@ class PluginGatewayControllerTest {
             "SEMI",
             "ACTIVE",
             "{\"goal\":\"x\"}",
+            "{}",
             "[]",
             "[]",
             Instant.now()

@@ -29,6 +29,9 @@ public class TaskEntity {
     private String strategyJson;
 
     @Lob
+    private String ruleConfigJson;
+
+    @Lob
     private String excludeJson;
 
     @Lob
@@ -49,6 +52,7 @@ public class TaskEntity {
                       String automationLevel,
                       String status,
                       String strategyJson,
+                      String ruleConfigJson,
                       String excludeJson,
                       String preferencesJson,
                       Instant createdAt) {
@@ -61,6 +65,7 @@ public class TaskEntity {
         this.automationLevel = automationLevel;
         this.status = status;
         this.strategyJson = strategyJson;
+        this.ruleConfigJson = ruleConfigJson;
         this.excludeJson = excludeJson;
         this.preferencesJson = preferencesJson;
         this.createdAt = createdAt == null ? Instant.now() : createdAt;
@@ -109,6 +114,10 @@ public class TaskEntity {
         return strategyJson;
     }
 
+    public String getRuleConfigJson() {
+        return ruleConfigJson;
+    }
+
     public String getExcludeJson() {
         return excludeJson;
     }
@@ -147,6 +156,10 @@ public class TaskEntity {
 
     public void setStrategyJson(String strategyJson) {
         this.strategyJson = strategyJson;
+    }
+
+    public void setRuleConfigJson(String ruleConfigJson) {
+        this.ruleConfigJson = ruleConfigJson;
     }
 
     public void setExcludeJson(String excludeJson) {

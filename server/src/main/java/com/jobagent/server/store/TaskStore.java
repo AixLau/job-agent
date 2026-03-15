@@ -5,13 +5,16 @@ import com.jobagent.server.dto.TaskCreateRequest;
 import com.jobagent.server.dto.TaskResponse;
 import com.jobagent.server.dto.TaskUpdateRequest;
 import com.jobagent.server.repository.TaskRepository;
+import com.jobagent.server.service.RuleConfigParser;
 import com.jobagent.server.service.StrategyService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -19,17 +22,28 @@ public class TaskStore {
 
     private final TaskRepository repository;
     private final StrategyService strategyService;
+    private final RuleConfigParser ruleConfigParser;
     private final ObjectMapper mapper;
 
-    public TaskStore(TaskRepository repository, StrategyService strategyService, ObjectMapper mapper) {
+    public TaskStore(TaskRepository repository,
+                     StrategyService strategyService,
+                     RuleConfigParser ruleConfigParser,
+                     ObjectMapper mapper) {
         this.repository = repository;
         this.strategyService = strategyService;
+        this.ruleConfigParser = ruleConfigParser;
         this.mapper = mapper;
     }
 
     public TaskResponse create(TaskCreateRequest request, String userId) {
         String id = UUID.randomUUID().toString();
         String strategyJson = strategyService.parse(request.strategyText(), id);
+        String ruleConfigJson = buildRuleConfigJson(
+            strategyJson,
+            request.salary(),
+            request.experience(),
+            request.automationLevel()
+        );
         TaskEntity entity = new TaskEntity(
             id,
             userId,
@@ -40,6 +54,7 @@ public class TaskStore {
             request.automationLevel(),
             "ACTIVE",
             strategyJson,
+            ruleConfigJson,
             toJson(request.exclude()),
             toJson(request.preferences()),
             Instant.now()
@@ -75,6 +90,17 @@ public class TaskStore {
         if (request.strategyText() != null) {
             entity.setStrategyJson(strategyService.parse(request.strategyText(), entity.getId()));
         }
+        if (request.salary() != null
+            || request.experience() != null
+            || request.automationLevel() != null
+            || request.strategyText() != null) {
+            entity.setRuleConfigJson(buildRuleConfigJson(
+                entity.getStrategyJson(),
+                entity.getSalary(),
+                entity.getExperience(),
+                entity.getAutomationLevel()
+            ));
+        }
         TaskEntity saved = repository.save(entity);
         return toResponse(saved);
     }
@@ -109,5 +135,40 @@ public class TaskStore {
         } catch (Exception ex) {
             return "[]";
         }
+    }
+
+    private String buildRuleConfigJson(String strategyJson,
+                                       String salary,
+                                       String experience,
+                                       String automationLevel) {
+        RuleConfigParser.RuleConfig parsed = ruleConfigParser.parse(strategyJson);
+        String resolvedSalary = firstNonBlank(parsed.salary(), salary);
+        String resolvedExperience = firstNonBlank(parsed.experience(), experience);
+        String resolvedAutomation = firstNonBlank(parsed.automationLevel(), automationLevel);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        if (resolvedSalary != null) {
+            payload.put("salary", resolvedSalary);
+        }
+        if (resolvedExperience != null) {
+            payload.put("experience", resolvedExperience);
+        }
+        if (resolvedAutomation != null) {
+            payload.put("automationLevel", resolvedAutomation);
+        }
+        try {
+            return mapper.writeValueAsString(payload);
+        } catch (Exception ex) {
+            return "{}";
+        }
+    }
+
+    private String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        if (fallback != null && !fallback.isBlank()) {
+            return fallback;
+        }
+        return null;
     }
 }

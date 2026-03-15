@@ -37,6 +37,10 @@ public class JobMatchEntity {
     @Column(name = "risk_tags_json", columnDefinition = "text")
     private String riskTagsJson;
 
+    @Lob
+    @Column(name = "rule_json", columnDefinition = "text")
+    private String ruleJson;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -49,6 +53,7 @@ public class JobMatchEntity {
                           Integer score,
                           String reasonJson,
                           String riskTagsJson,
+                          String ruleJson,
                           Instant createdAt) {
         this.id = id;
         this.taskId = taskId;
@@ -56,6 +61,7 @@ public class JobMatchEntity {
         this.score = score;
         this.reasonJson = reasonJson;
         this.riskTagsJson = riskTagsJson;
+        this.ruleJson = ruleJson;
         this.createdAt = createdAt == null ? Instant.now() : createdAt;
     }
 
@@ -88,6 +94,10 @@ public class JobMatchEntity {
 
     public String getRiskTagsJson() {
         return riskTagsJson;
+    }
+
+    public String getRuleJson() {
+        return ruleJson;
     }
 
     public Instant getCreatedAt() {
