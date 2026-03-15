@@ -76,8 +76,8 @@ public class RuleEngineService {
                 readInt(parsedJob, "salary_max", "salaryMax")
             );
             RuleResult.Range experience = new RuleResult.Range(
-                readInt(parsedJob, "experience_min", "experienceMin"),
-                readInt(parsedJob, "experience_max", "experienceMax")
+                readInt(parsedJob, "exp_min", "expMin", "experience_min", "experienceMin"),
+                readInt(parsedJob, "exp_max", "expMax", "experience_max", "experienceMax")
             );
             return new RuleResult.ParsedRange(salary, experience);
         }
@@ -102,12 +102,21 @@ public class RuleEngineService {
         return List.copyOf(merged);
     }
 
-    private Integer readInt(Map<String, Object> data, String primaryKey, String fallbackKey) {
-        Object value = data.get(primaryKey);
-        if (value == null && fallbackKey != null) {
-            value = data.get(fallbackKey);
+    private Integer readInt(Map<String, Object> data, String... keys) {
+        if (data == null || keys == null) {
+            return null;
         }
-        return toInt(value);
+        for (String key : keys) {
+            if (key == null) {
+                continue;
+            }
+            Object value = data.get(key);
+            Integer parsed = toInt(value);
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return null;
     }
 
     private Integer toInt(Object value) {

@@ -22,8 +22,8 @@ class RuleEngineServiceTest {
         Map<String, Object> parsedJob = Map.of(
             "salary_min", 10000,
             "salary_max", 12000,
-            "experience_min", 3,
-            "experience_max", 5
+            "exp_min", 3,
+            "exp_max", 5
         );
 
         RuleResult.ParsedRange range = service.resolveParsedRange(parsedJob, "20k-30k", "5-7年", "raw");
