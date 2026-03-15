@@ -1,4 +1,5 @@
 .worktrees/
 .m2repo/
+.superpowers/
 **/target/
 **/__pycache__/
