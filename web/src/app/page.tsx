@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchDashboard, fallbackDashboard } from "../lib/dashboard";
+import { blacklistCompany, followJob, ignoreJob } from "../lib/jobActions";
 import { fetchTasks } from "../lib/tasks";
 
 export default function Home() {
   const [dashboard, setDashboard] = useState(fallbackDashboard);
   const [tasks, setTasks] = useState([]);
+  const [actionState, setActionState] = useState("");
   const baseUrl = useMemo(
     () => process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8080",
     []
@@ -73,6 +75,61 @@ export default function Home() {
         },
       ];
 
+  const handleAction = async (kind, payload) => {
+    const token = localStorage.getItem("access_token") || "";
+    try {
+      if (kind === "follow") {
+        await followJob(baseUrl, token, payload.jobPostId);
+        setActionState("已加入关注列表");
+        return;
+      }
+      if (kind === "ignore") {
+        await ignoreJob(baseUrl, token, payload.jobPostId);
+        setActionState("已忽略并归档");
+        return;
+      }
+      await blacklistCompany(baseUrl, token, {
+        companyName: payload.company,
+        source: payload.source || "boss",
+      });
+      setActionState("已加入公司黑名单");
+    } catch (error) {
+      setActionState("操作失败，请稍后重试");
+    }
+  };
+
+  const renderActions = (item, key) => {
+    const jobPostId = item.jobPostId || item.job_post_id || "";
+    const company = item.company || "";
+    const actionDisabled = !jobPostId;
+    const blacklistDisabled = !company;
+    return (
+      <div className="action-row" key={`${key}-actions`}>
+        <button
+          type="button"
+          disabled={actionDisabled}
+          onClick={() => handleAction("follow", { jobPostId, company })}
+        >
+          关注
+        </button>
+        <button
+          type="button"
+          disabled={actionDisabled}
+          onClick={() => handleAction("ignore", { jobPostId, company })}
+        >
+          忽略
+        </button>
+        <button
+          type="button"
+          disabled={blacklistDisabled}
+          onClick={() => handleAction("blacklist", { company, source: "boss" })}
+        >
+          拉黑公司
+        </button>
+      </div>
+    );
+  };
+
   return (
     <main className="page">
       <header className="topbar">
@@ -80,6 +137,7 @@ export default function Home() {
           <p className="eyebrow">Boss 直聘 · 半自动模式</p>
           <h1>Job Agent 工作台</h1>
           <p className="subtitle">聚焦关键节点，其余交给智能体。</p>
+          {actionState ? <p className="hint">{actionState}</p> : null}
         </div>
         <div className="status-card">
           <p className="label">任务状态</p>
@@ -105,13 +163,14 @@ export default function Home() {
           </div>
           <div className="list">
             {displayRecommendations.map((item) => (
-              <div className="list-item" key={item.title}>
+              <div className="list-item" key={item.jobPostId || item.title}>
                 <div>
                   <p className="title">{item.title}</p>
                   <p className="muted">{item.company}</p>
                   <p className="hint">
                     {Array.isArray(item.risks) ? item.risks.join(" / ") : ""}
                   </p>
+                  {renderActions(item, item.jobPostId || item.title)}
                 </div>
                 <div className="score">{item.score}</div>
               </div>
@@ -129,8 +188,9 @@ export default function Home() {
               {displayDrafts.map((item) => (
                 <div className="list-item compact" key={item.draftId ?? item.conversationId}>
                   <div>
-                    <p className="title">{item.conversationId ?? "草稿"}</p>
+                    <p className="title">{item.company || item.conversationId || "草稿"}</p>
                     <p className="muted">{item.content ?? ""}</p>
+                    {renderActions(item, item.draftId ?? item.conversationId)}
                   </div>
                   <span className="tag">{item.approved ? "已确认" : "待确认"}</span>
                 </div>
@@ -147,8 +207,9 @@ export default function Home() {
               {displayReplies.map((item) => (
                 <div className="list-item compact" key={item.conversationId}>
                   <div>
-                    <p className="title">{item.conversationId}</p>
+                    <p className="title">{item.company || item.conversationId}</p>
                     <p className="muted">{item.intent}</p>
+                    {renderActions(item, item.conversationId)}
                   </div>
                   <span className="tag ghost">
                     {item.summary ?? "待处理"}

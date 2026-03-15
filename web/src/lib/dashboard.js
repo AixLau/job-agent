@@ -21,12 +21,16 @@ const normalizeDraft = (item) => ({
   ...item,
   draftId: item.draftId ?? item.draft_id ?? "",
   conversationId: item.conversationId ?? item.conversation_id ?? "",
+  jobPostId: item.jobPostId ?? item.job_post_id ?? "",
+  company: item.company ?? "",
   createdAt: item.createdAt ?? item.created_at ?? "",
 });
 
 const normalizeReply = (item) => ({
   ...item,
   conversationId: item.conversationId ?? item.conversation_id ?? "",
+  jobPostId: item.jobPostId ?? item.job_post_id ?? "",
+  company: item.company ?? "",
   updatedAt: item.updatedAt ?? item.updated_at ?? "",
 });
 
