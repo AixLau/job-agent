@@ -6,13 +6,12 @@ import { fallbackRecommendations, fetchRecommendations } from "../src/lib/recomm
 test("fetchRecommendations returns normalized recommendation list", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, options) => {
-    assert.equal(url, "http://example.com/api/dashboard");
+    assert.equal(url, "http://example.com/api/recommendations");
     assert.equal(options.headers.Authorization, "Bearer token");
     return {
       ok: true,
       json: async () => ({
-        metrics: {},
-        recommendations: [
+        items: [
           {
             job_post_id: "job-1",
             title: "产品经理",

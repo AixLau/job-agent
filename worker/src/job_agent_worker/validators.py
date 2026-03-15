@@ -7,6 +7,8 @@ class ValidationError(ValueError):
 
 
 ALLOWED_INTENTS = {"INTERVIEW", "FOLLOW_UP", "REJECTED"}
+ALLOWED_PRIORITIES = {"HIGH", "NORMAL", "LOW"}
+ALLOWED_STATUSES = {"INTERVIEW", "WAITING_HR", "NEEDS_REPLY", "CLOSED"}
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_PATTERN = re.compile(r"\b\d{11}\b")
 
@@ -59,6 +61,28 @@ def validate_draft_payload(payload: Dict[str, Any]) -> None:
         if len(interview_text) < 10 or len(interview_text) > 500:
             raise ValidationError("invalid interview draft")
         _validate_common_text(interview_text)
+
+
+def validate_follow_up_payload(payload: Dict[str, Any]) -> None:
+    priority = str(payload.get("priority") or "").strip().upper()
+    suggested_status = str(payload.get("suggested_status") or "").strip().upper()
+    next_action = str(payload.get("next_action") or "").strip()
+    draft_content = str(payload.get("draft_content") or "").strip()
+    follow_up_hours = payload.get("follow_up_hours")
+
+    if priority not in ALLOWED_PRIORITIES:
+        raise ValidationError("invalid priority")
+    if suggested_status not in ALLOWED_STATUSES:
+        raise ValidationError("invalid suggested status")
+    if not next_action or len(next_action) > 100:
+        raise ValidationError("invalid next action")
+    if not draft_content or len(draft_content) > 500:
+        raise ValidationError("invalid draft content")
+    if not isinstance(follow_up_hours, int) or follow_up_hours < 0 or follow_up_hours > 168:
+        raise ValidationError("invalid follow up hours")
+
+    _validate_common_text(next_action)
+    _validate_common_text(draft_content)
 
 
 def _validate_common_text(value: str) -> None:

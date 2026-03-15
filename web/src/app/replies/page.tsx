@@ -36,10 +36,18 @@ export default function RepliesPage() {
                 <p className="title">{item.company || item.conversationId}</p>
                 <p className="muted">{item.intent}</p>
                 <p className="hint">{item.summary}</p>
+                <p className="muted">{item.nextAction || "待确认下一步"}</p>
               </div>
-              <span className="tag ghost">
-                {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "recent"}
-              </span>
+              <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
+                <span className="tag ghost">{item.priority || "NORMAL"}</span>
+                <span className="tag ghost">
+                  {item.followUpAt
+                    ? new Date(item.followUpAt).toLocaleString()
+                    : item.updatedAt
+                      ? new Date(item.updatedAt).toLocaleString()
+                      : "recent"}
+                </span>
+              </div>
             </div>
           ))}
         </div>

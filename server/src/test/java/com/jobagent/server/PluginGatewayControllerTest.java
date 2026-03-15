@@ -2,6 +2,7 @@ package com.jobagent.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.WorkerDraftResponse;
+import com.jobagent.server.dto.WorkerFollowUpResponse;
 import com.jobagent.server.dto.WorkerJobMatchResponse;
 import com.jobagent.server.dto.WorkerReplyClassifyResponse;
 import com.jobagent.server.repository.ConversationRepository;
@@ -576,6 +577,90 @@ class PluginGatewayControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.auto_send").value(false))
             .andExpect(jsonPath("$.draft.content").value("人工确认草稿"));
+    }
+
+    @Test
+    void chat_report_builds_interview_draft_and_follow_up_metadata() throws Exception {
+        resetData();
+        seedTokenAndTask("AUTO");
+
+        JobPostEntity jobPost = new JobPostEntity(
+            "job-3",
+            "task-1",
+            "boss",
+            "ext-3",
+            "Role C",
+            "Company C",
+            "Shanghai",
+            "30k-40k",
+            "5y",
+            "raw",
+            "{}",
+            "REPLIED",
+            Instant.now()
+        );
+        jobPostRepository.save(jobPost);
+        jobMatchRepository.save(new JobMatchEntity(
+            "match-3",
+            "task-1",
+            "job-3",
+            92,
+            "[\"fit\"]",
+            "[]",
+            "{\"automation_action\":\"AUTO_SEND\"}",
+            Instant.now()
+        ));
+
+        ConversationEntity conversation = new ConversationEntity(
+            UUID.randomUUID().toString(),
+            "task-1",
+            "job-3",
+            "conv-interview",
+            "WAITING_HR",
+            null,
+            null,
+            null,
+            Instant.now()
+        );
+        conversationRepository.save(conversation);
+
+        when(workerClient.replyClassify(any()))
+            .thenReturn(new WorkerReplyClassifyResponse("INTERVIEW", "HR 发来面试邀约", "确认面试时间"));
+        when(workerClient.followUp(any()))
+            .thenReturn(new WorkerFollowUpResponse(
+                "HIGH",
+                "INTERVIEW",
+                "确认面试时间",
+                0,
+                "你好，我已收到面试邀约，今天下午可以参加。",
+                false
+            ));
+
+        String chatBody = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "conversation_id", "conv-interview",
+            "messages", List.of(Map.of("id", "m1", "role", "hr", "text", "方便今天下午面试吗")),
+            "last_message_id", "m1"
+        ));
+
+        mockMvc.perform(post("/plugin/chat/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(chatBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.reply.intent").value("INTERVIEW"))
+            .andExpect(jsonPath("$.draft.content").value("你好，我已收到面试邀约，今天下午可以参加。"))
+            .andExpect(jsonPath("$.action_hint.fill_content").value("你好，我已收到面试邀约，今天下午可以参加。"));
+
+        ConversationEntity updated = conversationRepository.findById(conversation.getId()).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(updated.getStatus()).isEqualTo("INTERVIEW");
+        org.assertj.core.api.Assertions.assertThat(updated.getLastAction()).isEqualTo("确认面试时间");
+        org.assertj.core.api.Assertions.assertThat(updated.getPriority()).isEqualTo("HIGH");
+        org.assertj.core.api.Assertions.assertThat(updated.getFollowUpAt()).isNotNull();
+
+        MessageDraftEntity draft = messageDraftRepository.findByConversationIdAndSourceType(conversation.getId(), "SYSTEM")
+            .orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(draft.getContent()).contains("面试邀约");
     }
 
     @Test

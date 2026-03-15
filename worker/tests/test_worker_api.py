@@ -201,6 +201,45 @@ class WorkerApiTest(unittest.TestCase):
         self.assertTrue(payload["summary"])
         self.assertTrue(payload["next_action"])
 
+    def test_follow_up_returns_interview_plan(self):
+        response = self.client.post(
+            "/worker/follow-up",
+            headers=self.headers,
+            json={
+                "task_id": "t1",
+                "stage": "FOLLOW_UP",
+                "conversation": {"id": "c1"},
+                "messages": [{"id": "m1", "role": "hr", "text": "方便安排面试吗"}],
+                "last_message_id": "m1",
+                "idempotency_key": "k-follow-up-1"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["priority"], "HIGH")
+        self.assertEqual(payload["suggested_status"], "INTERVIEW")
+        self.assertEqual(payload["follow_up_hours"], 0)
+        self.assertIn("面试", payload["draft_content"])
+
+    def test_follow_up_returns_waiting_hr_plan(self):
+        response = self.client.post(
+            "/worker/follow-up",
+            headers=self.headers,
+            json={
+                "task_id": "t1",
+                "stage": "FOLLOW_UP",
+                "conversation": {"id": "c1"},
+                "messages": [{"id": "m2", "role": "hr", "text": "收到，后续有进展再同步你。"}],
+                "last_message_id": "m2",
+                "idempotency_key": "k-follow-up-2"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["priority"], "NORMAL")
+        self.assertEqual(payload["suggested_status"], "WAITING_HR")
+        self.assertEqual(payload["follow_up_hours"], 24)
+
     def test_resume_parse_returns_preview_fields(self):
         response = self.client.post(
             "/worker/resume-parse",

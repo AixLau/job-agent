@@ -35,6 +35,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Service
 public class JobPostService {
@@ -136,6 +138,10 @@ public class JobPostService {
             jobPostRepository.save(post);
         }
 
+        CompletableFuture<WorkerDraftResponse> draftFuture = shouldPrepareDraft(request)
+            ? CompletableFuture.supplyAsync(() -> generateDraft(task, request, post, resume, extracted))
+            : null;
+
         WorkerJobMatchResponse matchResponse = callJobMatch(task, post, resume, extracted);
         validator.validateJobMatch(matchResponse);
         int score = matchResponse.score() == null ? 0 : matchResponse.score();
@@ -190,8 +196,10 @@ public class JobPostService {
         }
 
         DraftItem draftItem = null;
-        if (visibleRecommendation && isDetailPage(request) && Boolean.TRUE.equals(request.wantDraft())) {
-            draftItem = buildDraft(request, post, resume, extracted, userId);
+        if (visibleRecommendation && draftFuture != null) {
+            draftItem = persistDraft(request, post, userId, join(draftFuture));
+        } else if (draftFuture != null) {
+            draftFuture.cancel(true);
         }
 
         return new PageReportResponse("ok", analysis, draftItem);
@@ -216,11 +224,41 @@ public class JobPostService {
         }
     }
 
-    private DraftItem buildDraft(PageReportRequest request,
-                                 JobPostEntity post,
-                                 ResumeEntity resume,
-                                 Map<String, Object> extracted,
-                                 String userId) {
+    private WorkerDraftResponse generateDraft(TaskEntity task,
+                                              PageReportRequest request,
+                                              JobPostEntity post,
+                                              ResumeEntity resume,
+                                              Map<String, Object> extracted) {
+        String externalId = post.getExternalId();
+        String conversationExternalId = conversationExternalId(request, externalId);
+        Map<String, Object> jobPost = buildJobPostMap(post, extracted);
+        Map<String, Object> resumeMap = resume == null ? Collections.emptyMap() : readMap(resume.getParsedJson());
+        WorkerDraftRequest workerRequest = new WorkerDraftRequest(
+            task.getId(),
+            "DRAFT",
+            Map.of("id", conversationExternalId, "external_id", conversationExternalId),
+            jobPost,
+            resumeMap,
+            IdempotencyKeys.draft(request.taskId(), conversationExternalId, externalId)
+        );
+        WorkerDraftResponse draftResponse;
+        try {
+            draftResponse = workerClient.buildDraft(workerRequest);
+        } catch (RestClientException ex) {
+            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "WORKER_TIMEOUT");
+        }
+        try {
+            validator.validateDraft(draftResponse.content());
+        } catch (ValidationException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
+        }
+        return draftResponse;
+    }
+
+    private DraftItem persistDraft(PageReportRequest request,
+                                   JobPostEntity post,
+                                   String userId,
+                                   WorkerDraftResponse draftResponse) {
         String externalId = post.getExternalId();
         String conversationExternalId = conversationExternalId(request, externalId);
         ConversationEntity conversation = conversationRepository.findByTaskIdAndExternalId(request.taskId(), conversationExternalId)
@@ -238,28 +276,6 @@ public class JobPostService {
         conversation.setJobPostId(post.getId());
         conversation.setStatus(STATUS_WAITING_USER);
         conversationRepository.save(conversation);
-
-        Map<String, Object> jobPost = buildJobPostMap(post, extracted);
-        Map<String, Object> resumeMap = resume == null ? Collections.emptyMap() : readMap(resume.getParsedJson());
-        WorkerDraftRequest workerRequest = new WorkerDraftRequest(
-            request.taskId(),
-            "DRAFT",
-            Map.of("id", conversation.getId(), "external_id", conversation.getExternalId()),
-            jobPost,
-            resumeMap,
-            IdempotencyKeys.draft(request.taskId(), conversationExternalId, externalId)
-        );
-        WorkerDraftResponse draftResponse;
-        try {
-            draftResponse = workerClient.buildDraft(workerRequest);
-        } catch (RestClientException ex) {
-            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "WORKER_TIMEOUT");
-        }
-        try {
-            validator.validateDraft(draftResponse.content());
-        } catch (ValidationException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
-        }
 
         MessageDraftEntity draft = new MessageDraftEntity(
             UUID.randomUUID().toString(),
@@ -298,6 +314,10 @@ public class JobPostService {
 
     private boolean isDetailPage(PageReportRequest request) {
         return request.pageType() != null && request.pageType().equalsIgnoreCase("detail");
+    }
+
+    private boolean shouldPrepareDraft(PageReportRequest request) {
+        return isDetailPage(request) && Boolean.TRUE.equals(request.wantDraft());
     }
 
     private String conversationExternalId(PageReportRequest request, String externalId) {
@@ -360,6 +380,21 @@ public class JobPostService {
         jobPost.put("raw_text", post.getJdRaw());
         jobPost.put("extracted_json", extracted);
         return jobPost;
+    }
+
+    private <T> T join(CompletableFuture<T> future) {
+        try {
+            return future.join();
+        } catch (CompletionException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof ResponseStatusException responseStatusException) {
+                throw responseStatusException;
+            }
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw ex;
+        }
     }
 
     private boolean isBlacklisted(String userId, String source, String company) {

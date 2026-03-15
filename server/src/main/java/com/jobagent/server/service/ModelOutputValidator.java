@@ -1,6 +1,7 @@
 package com.jobagent.server.service;
 
 import com.jobagent.server.dto.WorkerJobMatchResponse;
+import com.jobagent.server.dto.WorkerFollowUpResponse;
 import com.jobagent.server.dto.WorkerReplyClassifyResponse;
 import jakarta.validation.ValidationException;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,8 @@ public class ModelOutputValidator {
     private static final int SUMMARY_MAX = 200;
     private static final int NEXT_ACTION_MAX = 100;
     private static final List<String> ALLOWED_INTENTS = List.of("INTERVIEW", "FOLLOW_UP", "REJECTED");
+    private static final List<String> ALLOWED_PRIORITIES = List.of("HIGH", "NORMAL", "LOW");
+    private static final List<String> ALLOWED_STATUSES = List.of("INTERVIEW", "WAITING_HR", "NEEDS_REPLY", "CLOSED");
 
     private static final Pattern EMAIL_PATTERN =
         Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
@@ -98,6 +101,35 @@ public class ModelOutputValidator {
         }
         validateStringList(response.risks());
         validateParsedJob(response.parsedJob());
+    }
+
+    public void validateFollowUp(WorkerFollowUpResponse response) {
+        if (response == null) {
+            throw new ValidationException("follow up payload missing");
+        }
+        String priority = response.priority() == null ? "" : response.priority().trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_PRIORITIES.contains(priority)) {
+            throw new ValidationException("invalid priority");
+        }
+        String suggestedStatus = response.suggestedStatus() == null
+            ? ""
+            : response.suggestedStatus().trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_STATUSES.contains(suggestedStatus)) {
+            throw new ValidationException("invalid suggested status");
+        }
+        String nextAction = response.nextAction() == null ? "" : response.nextAction().trim();
+        if (nextAction.isBlank() || nextAction.length() > NEXT_ACTION_MAX) {
+            throw new ValidationException("invalid next action");
+        }
+        validateCommon(nextAction);
+        String draftContent = response.draftContent();
+        if (draftContent != null && !draftContent.isBlank()) {
+            validateDraft(draftContent);
+        }
+        Integer followUpHours = response.followUpHours();
+        if (followUpHours == null || followUpHours < 0 || followUpHours > 168) {
+            throw new ValidationException("invalid follow up hours");
+        }
     }
 
     private void validateCommon(String value) {

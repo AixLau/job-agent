@@ -6,14 +6,17 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 
 from job_agent_worker.models import (
     DraftRequest,
+    FollowUpRequest,
     GoalParseRequest,
     JobMatchRequest,
     ResumeParseRequest,
     ReplyClassifyRequest,
 )
+from job_agent_worker.follow_up import build_follow_up_plan
 from job_agent_worker.task_parser import parse_task_strategy
 from job_agent_worker.validators import (
     validate_draft_payload,
+    validate_follow_up_payload,
     validate_job_match_payload,
     validate_reply_payload,
     validate_task_strategy,
@@ -44,6 +47,7 @@ goal_parse_cache: Dict[str, Dict[str, Any]] = {}
 job_match_cache: Dict[str, Dict[str, Any]] = {}
 draft_cache: Dict[str, Dict[str, Any]] = {}
 reply_cache: Dict[str, Dict[str, Any]] = {}
+follow_up_cache: Dict[str, Dict[str, Any]] = {}
 resume_parse_cache: Dict[str, Dict[str, Any]] = {}
 
 
@@ -119,6 +123,18 @@ def reply_classify(
         return {"intent": intent, "summary": summary, "next_action": next_action}
     response = cached_response(reply_cache, request.idempotency_key, build)
     validate_reply_payload(response)
+    return response
+
+
+@app.post("/worker/follow-up")
+def follow_up(
+    request: FollowUpRequest, _: str = Depends(require_worker_token)
+) -> Dict[str, Any]:
+    def build() -> Dict[str, Any]:
+        return build_follow_up_plan(request.messages, request.last_message_id)
+
+    response = cached_response(follow_up_cache, request.idempotency_key, build)
+    validate_follow_up_payload(response)
     return response
 
 

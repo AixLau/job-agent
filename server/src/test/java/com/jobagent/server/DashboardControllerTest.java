@@ -93,6 +93,11 @@ class DashboardControllerTest {
             null,
             Instant.parse("2024-01-02T00:00:00Z")
         ));
+        ConversationEntity conversation = conversationRepository.findById("conv-1").orElseThrow();
+        conversation.setLastAction("确认面试时间");
+        conversation.setPriority("HIGH");
+        conversation.setFollowUpAt(Instant.parse("2024-01-02T01:00:00Z"));
+        conversationRepository.save(conversation);
 
         dashboardStore.addRecommendation(userId, new RecommendationItem(
             "job-1",
@@ -106,14 +111,19 @@ class DashboardControllerTest {
         dashboardStore.addDraft(userId, new DraftItem(
             "draft-1",
             "conv-1",
-            "hello",
+            "你好，我已收到面试邀约，今天下午可以参加。",
             Instant.parse("2024-01-01T00:00:00Z"),
             false
         ));
         dashboardStore.addReply(userId, new ReplyItem(
             "conv-1",
+            "job-1",
+            "Company A",
             "summary",
             "INTERVIEW",
+            "确认面试时间",
+            "HIGH",
+            Instant.parse("2024-01-02T01:00:00Z"),
             Instant.parse("2024-01-02T00:00:00Z")
         ));
 
@@ -132,8 +142,96 @@ class DashboardControllerTest {
             .andExpect(jsonPath("$.replies[0].conversation_id").value("conv-1"))
             .andExpect(jsonPath("$.replies[0].job_post_id").value("job-1"))
             .andExpect(jsonPath("$.replies[0].company").value("Company A"))
+            .andExpect(jsonPath("$.replies[0].next_action").value("确认面试时间"))
+            .andExpect(jsonPath("$.replies[0].priority").value("HIGH"))
+            .andExpect(jsonPath("$.replies[0].follow_up_at").value("2024-01-02T01:00:00Z"))
             .andExpect(jsonPath("$.interviews[0].conversation_id").value("conv-1"))
+            .andExpect(jsonPath("$.interviews[0].draft_content").value("你好，我已收到面试邀约，今天下午可以参加。"))
             .andExpect(jsonPath("$.updated_at").exists());
+    }
+
+    @Test
+    void workbench_list_endpoints_return_split_views() throws Exception {
+        resetData();
+        String accessToken = registerAndLogin();
+        String userId = userRepository.findByAccount("alice").orElseThrow().getId();
+
+        jobPostRepository.save(new JobPostEntity(
+            "job-2",
+            "task-1",
+            "boss",
+            "ext-2",
+            "Role B",
+            "Company B",
+            "Shanghai",
+            "30k-40k",
+            "5y",
+            "raw",
+            "{}",
+            "INTERVIEW",
+            Instant.parse("2024-01-03T00:00:00Z")
+        ));
+        ConversationEntity conversation = new ConversationEntity(
+            "conv-2",
+            "task-1",
+            "job-2",
+            "ext-conv-2",
+            "INTERVIEW",
+            "INTERVIEW",
+            "安排终面",
+            "确认终面时间",
+            Instant.parse("2024-01-03T01:00:00Z")
+        );
+        conversation.setPriority("HIGH");
+        conversation.setFollowUpAt(Instant.parse("2024-01-03T02:00:00Z"));
+        conversationRepository.save(conversation);
+
+        dashboardStore.addRecommendation(userId, new RecommendationItem(
+            "job-2",
+            "Role B",
+            "Company B",
+            91,
+            List.of("匹配：产品相关"),
+            List.of(),
+            "SHORTLISTED"
+        ));
+        dashboardStore.addReply(userId, new ReplyItem(
+            "conv-2",
+            "job-2",
+            "Company B",
+            "安排终面",
+            "INTERVIEW",
+            "确认终面时间",
+            "HIGH",
+            Instant.parse("2024-01-03T02:00:00Z"),
+            Instant.parse("2024-01-03T02:00:00Z")
+        ));
+        dashboardStore.addDraft(userId, new DraftItem(
+            "draft-2",
+            "conv-2",
+            "job-2",
+            "Company B",
+            "可以参加终面，感谢安排。",
+            Instant.parse("2024-01-03T02:00:00Z"),
+            false
+        ));
+
+        mockMvc.perform(get("/api/recommendations")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].job_post_id").value("job-2"));
+
+        mockMvc.perform(get("/api/replies")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].conversation_id").value("conv-2"))
+            .andExpect(jsonPath("$.items[0].next_action").value("确认终面时间"));
+
+        mockMvc.perform(get("/api/interviews")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].conversation_id").value("conv-2"))
+            .andExpect(jsonPath("$.items[0].draft_content").value("可以参加终面，感谢安排。"));
     }
 
     @Test

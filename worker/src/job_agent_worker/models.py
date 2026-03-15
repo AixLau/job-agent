@@ -37,6 +37,15 @@ class ReplyClassifyRequest(BaseModel):
     idempotency_key: str
 
 
+class FollowUpRequest(BaseModel):
+    task_id: str
+    stage: str
+    conversation: Dict[str, Any]
+    messages: List[Dict[str, Any]]
+    last_message_id: str
+    idempotency_key: str
+
+
 class ResumeParseRequest(BaseModel):
     content: str
     format: str

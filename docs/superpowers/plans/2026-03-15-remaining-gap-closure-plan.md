@@ -303,10 +303,10 @@
 - Test: `server/src/test/java/com/jobagent/server/PluginGatewayControllerTest.java`
 - Test: `web/tests/interviews.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖面试邀约识别、草稿生成、工作台展示、独立页面展示
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 打通 worker → server → dashboard → web 页面链路
-- [ ] Step 4: 运行测试，确认通过
+- [x] Step 1: 写失败测试，覆盖面试邀约识别、草稿生成、工作台展示、独立页面展示
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 打通 worker → server → dashboard → web 页面链路
+- [x] Step 4: 运行测试，确认通过
 - [ ] Step 5: 提交
 
 ### Task 8: Add multi-turn reply strategy and auto follow-up suggestion
@@ -322,12 +322,12 @@
 - Test: `worker/tests/test_follow_up.py`
 - Test: `web/tests/replies.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖多轮对话状态推进与自动跟进建议
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 实现 worker 跟进建议生成
-- [ ] Step 4: 实现 server 状态机与 reply list API
-- [ ] Step 5: 实现 Web 待处理回复页
-- [ ] Step 6: 运行测试，确认通过
+- [x] Step 1: 写失败测试，覆盖多轮对话状态推进与自动跟进建议
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 实现 worker 跟进建议生成
+- [x] Step 4: 实现 server 状态机与 reply list API
+- [x] Step 5: 实现 Web 待处理回复页
+- [x] Step 6: 运行测试，确认通过
 - [ ] Step 7: 提交
 
 ### Task 9: Add minimal multi-agent orchestration hooks
@@ -341,10 +341,10 @@
 - Test: `server/src/test/java/com/jobagent/server/service/ConversationServiceTest.java`
 - Test: `worker/tests/test_worker_api.py`
 
-- [ ] Step 1: 写失败测试，覆盖“解析/匹配/对话建议”并行子任务契约
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 用当前架构实现最小并行编排接口，不引入大重构
-- [ ] Step 4: 运行测试，确认通过
+- [x] Step 1: 写失败测试，覆盖“解析/匹配/对话建议”并行子任务契约
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 用当前架构实现最小并行编排接口，不引入大重构
+- [x] Step 4: 运行测试，确认通过
 - [ ] Step 5: 提交
 
 ---
@@ -369,7 +369,7 @@
 - [x] Step 3: 实现推荐岗位页、任务详情页、设置页
 - [x] Step 4: 把首页跳转入口补齐
 - [x] Step 5: 运行测试，确认通过
-- [ ] Step 6: 提交
+- [x] Step 6: 提交
 
 ### Task 11: Improve recommendation explainability
 
@@ -388,7 +388,7 @@
 - [x] Step 3: 补齐 server DTO 与 dashboard 数据
 - [x] Step 4: 补齐首页和推荐页的解释性展示
 - [x] Step 5: 运行测试，确认通过
-- [ ] Step 6: 提交
+- [x] Step 6: 提交
 
 ---
 

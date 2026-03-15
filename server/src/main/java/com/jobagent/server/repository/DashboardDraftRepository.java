@@ -9,4 +9,5 @@ import java.util.List;
 public interface DashboardDraftRepository extends JpaRepository<DashboardDraftEntity, String> {
 
     List<DashboardDraftEntity> findAllByUserIdOrderByCreatedAtDescIdDesc(String userId, Pageable pageable);
+    DashboardDraftEntity findFirstByConversationIdOrderByCreatedAtDescIdDesc(String conversationId);
 }

@@ -35,6 +35,8 @@ export default function InterviewsPage() {
               <div>
                 <p className="title">{item.company}</p>
                 <p className="muted">{item.title}</p>
+                <p className="hint">{item.nextAction || "待确认面试安排"}</p>
+                <p className="muted">{item.draftContent || "暂无邀约确认草稿"}</p>
               </div>
               <span className="tag">
                 {item.scheduledAt ? new Date(item.scheduledAt).toLocaleDateString() : "待安排"}

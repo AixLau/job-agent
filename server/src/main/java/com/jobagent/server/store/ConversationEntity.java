@@ -40,6 +40,12 @@ public class ConversationEntity {
     @Column(name = "last_action")
     private String lastAction;
 
+    @Column(name = "priority")
+    private String priority;
+
+    @Column(name = "follow_up_at")
+    private Instant followUpAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -55,6 +61,20 @@ public class ConversationEntity {
                               String lastSummary,
                               String lastAction,
                               Instant createdAt) {
+        this(id, taskId, jobPostId, externalId, status, lastIntent, lastSummary, lastAction, null, null, createdAt);
+    }
+
+    public ConversationEntity(String id,
+                              String taskId,
+                              String jobPostId,
+                              String externalId,
+                              String status,
+                              String lastIntent,
+                              String lastSummary,
+                              String lastAction,
+                              String priority,
+                              Instant followUpAt,
+                              Instant createdAt) {
         this.id = id;
         this.taskId = taskId;
         this.jobPostId = jobPostId;
@@ -63,6 +83,8 @@ public class ConversationEntity {
         this.lastIntent = lastIntent;
         this.lastSummary = lastSummary;
         this.lastAction = lastAction;
+        this.priority = priority;
+        this.followUpAt = followUpAt;
         this.createdAt = createdAt == null ? Instant.now() : createdAt;
     }
 
@@ -109,6 +131,14 @@ public class ConversationEntity {
         return createdAt;
     }
 
+    public String getPriority() {
+        return priority;
+    }
+
+    public Instant getFollowUpAt() {
+        return followUpAt;
+    }
+
     public void setJobPostId(String jobPostId) {
         this.jobPostId = jobPostId;
     }
@@ -127,5 +157,13 @@ public class ConversationEntity {
 
     public void setLastAction(String lastAction) {
         this.lastAction = lastAction;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
+
+    public void setFollowUpAt(Instant followUpAt) {
+        this.followUpAt = followUpAt;
     }
 }
