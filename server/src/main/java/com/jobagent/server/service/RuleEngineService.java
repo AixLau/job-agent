@@ -48,12 +48,20 @@ public class RuleEngineService {
 
     public RuleResult evaluate(String text, String strategyJson) {
         RuleConfigParser.RuleConfig config = ruleConfigParser.parse(strategyJson);
-        return evaluate(text, config.salary(), config.experience(), config.automationLevel(), List.of());
+        RuleResult.ParsedRange parsedRange = new RuleResult.ParsedRange(
+            salaryParser.parse(text),
+            experienceParser.parse(text)
+        );
+        return evaluateWithConfig(text, config, List.of(), parsedRange);
     }
 
     public RuleResult evaluate(String text, String ruleConfigJson, List<String> workerTags) {
         RuleConfigParser.RuleConfig config = ruleConfigParser.parse(ruleConfigJson);
-        return evaluate(text, config.salary(), config.experience(), config.automationLevel(), workerTags);
+        RuleResult.ParsedRange parsedRange = new RuleResult.ParsedRange(
+            salaryParser.parse(text),
+            experienceParser.parse(text)
+        );
+        return evaluateWithConfig(text, config, workerTags, parsedRange);
     }
 
     public RuleResult evaluateWithParsedRange(String text,
@@ -61,9 +69,20 @@ public class RuleEngineService {
                                               List<String> workerTags,
                                               RuleResult.ParsedRange parsedRange) {
         RuleConfigParser.RuleConfig config = ruleConfigParser.parse(ruleConfigJson);
+        return evaluateWithConfig(text, config, workerTags, parsedRange);
+    }
+
+    private RuleResult evaluateWithConfig(String text,
+                                          RuleConfigParser.RuleConfig config,
+                                          List<String> workerTags,
+                                          RuleResult.ParsedRange parsedRange) {
         List<String> riskTags = unionTags(riskRuleSet.match(text), workerTags);
         RuleResult.AutomationAction action = automationPolicy.evaluate(config.automationLevel(), riskTags);
-        return new RuleResult(true, riskTags, action, parsedRange);
+        boolean hardFilterPass = matchesHardFilter(text, config, parsedRange);
+        if (!hardFilterPass) {
+            action = RuleResult.AutomationAction.REQUIRE_REVIEW;
+        }
+        return new RuleResult(hardFilterPass, riskTags, action, parsedRange);
     }
 
     public RuleResult.ParsedRange resolveParsedRange(Map<String, Object> parsedJob,
@@ -141,5 +160,57 @@ public class RuleEngineService {
             return fallback;
         }
         return "";
+    }
+
+    private boolean matchesHardFilter(String text,
+                                      RuleConfigParser.RuleConfig config,
+                                      RuleResult.ParsedRange parsedRange) {
+        return matchesCity(text, config.city())
+            && matchesRange(salaryParser.parse(config.salary()), parsedRange == null ? null : parsedRange.salary())
+            && matchesRange(experienceParser.parse(config.experience()), parsedRange == null ? null : parsedRange.experience())
+            && excludesAllowed(text, config.exclude())
+            && matchesPreferences(text, config.preferences());
+    }
+
+    private boolean matchesCity(String text, String city) {
+        if (city == null || city.isBlank()) {
+            return true;
+        }
+        if (text == null || text.isBlank()) {
+            return true;
+        }
+        return text.contains(city);
+    }
+
+    private boolean matchesRange(RuleResult.Range expected, RuleResult.Range actual) {
+        if (isEmpty(expected) || actual == null || isEmpty(actual)) {
+            return true;
+        }
+        int expectedMin = expected.min() == null ? Integer.MIN_VALUE : expected.min();
+        int expectedMax = expected.max() == null ? Integer.MAX_VALUE : expected.max();
+        int actualMin = actual.min() == null ? Integer.MIN_VALUE : actual.min();
+        int actualMax = actual.max() == null ? Integer.MAX_VALUE : actual.max();
+        return expectedMin <= actualMax && actualMin <= expectedMax;
+    }
+
+    private boolean isEmpty(RuleResult.Range range) {
+        return range == null || (range.min() == null && range.max() == null);
+    }
+
+    private boolean excludesAllowed(String text, List<String> excludes) {
+        if (excludes == null || excludes.isEmpty() || text == null || text.isBlank()) {
+            return true;
+        }
+        return excludes.stream().noneMatch(token -> token != null && !token.isBlank() && text.contains(token));
+    }
+
+    private boolean matchesPreferences(String text, List<String> preferences) {
+        if (preferences == null || preferences.isEmpty()) {
+            return true;
+        }
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        return preferences.stream().anyMatch(token -> token != null && !token.isBlank() && text.contains(token));
     }
 }

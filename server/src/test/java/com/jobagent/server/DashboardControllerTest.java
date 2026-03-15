@@ -134,6 +134,44 @@ class DashboardControllerTest {
             .andExpect(jsonPath("$.updated_at").exists());
     }
 
+    @Test
+    void dashboard_snapshot_hides_archived_recommendations() throws Exception {
+        resetData();
+        String accessToken = registerAndLogin();
+        String userId = userRepository.findByAccount("alice").orElseThrow().getId();
+
+        jobPostRepository.save(new JobPostEntity(
+            "job-archived",
+            "task-1",
+            "boss",
+            "ext-archived",
+            "Role Archived",
+            "Company A",
+            "Shanghai",
+            "20k-30k",
+            "3y",
+            "raw",
+            "{}",
+            "ARCHIVED",
+            Instant.parse("2024-01-01T00:00:00Z")
+        ));
+
+        dashboardStore.addRecommendation(userId, new RecommendationItem(
+            "job-archived",
+            "Role Archived",
+            "Company A",
+            80,
+            List.of("risk1"),
+            "SHORTLISTED"
+        ));
+
+        mockMvc.perform(get("/api/dashboard")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.metrics.recommendations").value(0))
+            .andExpect(jsonPath("$.recommendations").isEmpty());
+    }
+
     private void resetData() {
         conversationRepository.deleteAll();
         jobPostRepository.deleteAll();

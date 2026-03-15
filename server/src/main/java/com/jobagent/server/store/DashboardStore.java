@@ -129,6 +129,7 @@ public class DashboardStore {
             List<RecommendationItem> recList = recommendationRepository
                 .findAllByUserIdOrderByCreatedAtDescIdDesc(userId, page)
                 .stream()
+                .filter(this::isVisibleRecommendation)
                 .map(this::toRecommendation)
                 .toList();
             List<DraftItem> draftList = draftRepository
@@ -256,5 +257,13 @@ public class DashboardStore {
     private DashboardResponse emptyResponse() {
         DashboardMetrics metrics = new DashboardMetrics(0, 0, 0, 0);
         return new DashboardResponse(metrics, List.of(), List.of(), List.of(), List.of(), java.time.Instant.now());
+    }
+
+    private boolean isVisibleRecommendation(DashboardRecommendationEntity entity) {
+        if (entity == null || entity.getJobPostId() == null) {
+            return false;
+        }
+        JobPostEntity post = jobPostRepository.findById(entity.getJobPostId()).orElse(null);
+        return post != null && !"ARCHIVED".equalsIgnoreCase(post.getStatus());
     }
 }

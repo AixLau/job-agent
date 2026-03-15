@@ -233,6 +233,31 @@ class JobActionControllerTest {
     }
 
     @Test
+    void blacklist_archives_existing_company_posts_for_current_user() throws Exception {
+        String token = registerAndLogin("alice");
+        UserEntity user = userRepository.findByAccount("alice").orElseThrow();
+        TaskEntity task = createTask(user.getId());
+        JobPostEntity badOne = createJobPost(task.getId(), "Boss1", "BadCo");
+        JobPostEntity badTwo = createJobPost(task.getId(), "Boss2", "BadCo");
+        JobPostEntity good = createJobPost(task.getId(), "Boss3", "GoodCo");
+
+        String body = mapper.writeValueAsString(Map.of(
+            "company_name", "BadCo",
+            "source", "boss"
+        ));
+
+        mockMvc.perform(post("/api/blacklist/company")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk());
+
+        assertThat(jobPostRepository.findById(badOne.getId()).orElseThrow().getStatus()).isEqualTo("ARCHIVED");
+        assertThat(jobPostRepository.findById(badTwo.getId()).orElseThrow().getStatus()).isEqualTo("ARCHIVED");
+        assertThat(jobPostRepository.findById(good.getId()).orElseThrow().getStatus()).isEqualTo("DISCOVERED");
+    }
+
+    @Test
     void auth_required_for_job_actions() throws Exception {
         mockMvc.perform(post("/api/jobs/job-1/follow"))
             .andExpect(status().isUnauthorized());

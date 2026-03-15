@@ -97,6 +97,7 @@ public class JobActionController {
             .orElseGet(() -> userCompanyBlacklistRepository.save(
                 new UserCompanyBlacklistEntity(UUID.randomUUID().toString(), userId, companyName, source, Instant.now())
             ));
+        archiveCompanyPosts(userId, companyName, source);
         auditService.record(userId, "COMPANY_BLACKLIST", "{\"company_name\":\"" + companyName + "\",\"source\":\"" + source + "\"}");
         return Map.of("status", "ok");
     }
@@ -158,5 +159,18 @@ public class JobActionController {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void archiveCompanyPosts(String userId, String companyName, String source) {
+        List<String> taskIds = taskRepository.findAllByUserId(userId)
+            .stream()
+            .map(task -> task.getId())
+            .toList();
+        if (taskIds.isEmpty()) {
+            return;
+        }
+        List<JobPostEntity> posts = jobPostRepository.findAllByTaskIdInAndSourceAndCompanyIgnoreCase(taskIds, source, companyName);
+        posts.forEach(post -> post.setStatus("ARCHIVED"));
+        jobPostRepository.saveAll(posts);
     }
 }

@@ -218,7 +218,7 @@
 - [x] Step 6: 写 Web 失败测试，覆盖完整字段表单与自然语言辅助输入
 - [x] Step 7: 改造任务页
 - [x] Step 8: 运行 Web 测试，确认通过
-- [ ] Step 9: 提交
+- [x] Step 9: 提交
 
 ### Task 4: Implement real hard filters and recommendation suppression
 
@@ -234,14 +234,14 @@
 - Test: `server/src/test/java/com/jobagent/server/controller/JobActionControllerTest.java`
 - Test: `server/src/test/java/com/jobagent/server/DashboardControllerTest.java`
 
-- [ ] Step 1: 写失败测试，覆盖城市/薪资/年限/排除项/偏好项过滤
-- [ ] Step 2: 写失败测试，覆盖黑名单公司拦截
-- [ ] Step 3: 写失败测试，覆盖 `IGNORE/ARCHIVED` 后不再进入推荐/工作台
-- [ ] Step 4: 运行测试，确认失败
-- [ ] Step 5: 在 `RuleEngineService` 落地 `hard_filter_pass`
-- [ ] Step 6: 在 `JobPostService` 接入黑名单与忽略过滤
-- [ ] Step 7: 让 dashboard/recommendation 查询只返回可见岗位
-- [ ] Step 8: 运行测试，确认通过
+- [x] Step 1: 写失败测试，覆盖城市/薪资/年限/排除项/偏好项过滤
+- [x] Step 2: 写失败测试，覆盖黑名单公司拦截
+- [x] Step 3: 写失败测试，覆盖 `IGNORE/ARCHIVED` 后不再进入推荐/工作台
+- [x] Step 4: 运行测试，确认失败
+- [x] Step 5: 在 `RuleEngineService` 落地 `hard_filter_pass`
+- [x] Step 6: 在 `JobPostService` 接入黑名单与忽略过滤
+- [x] Step 7: 让 dashboard/recommendation 查询只返回可见岗位
+- [x] Step 8: 运行测试，确认通过
 - [ ] Step 9: 提交
 
 ---

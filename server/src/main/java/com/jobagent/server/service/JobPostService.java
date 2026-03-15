@@ -17,6 +17,7 @@ import com.jobagent.server.repository.JobPostRepository;
 import com.jobagent.server.repository.MessageDraftRepository;
 import com.jobagent.server.repository.ResumeRepository;
 import com.jobagent.server.repository.TaskRepository;
+import com.jobagent.server.repository.UserCompanyBlacklistRepository;
 import com.jobagent.server.store.ConversationEntity;
 import com.jobagent.server.store.JobMatchEntity;
 import com.jobagent.server.store.JobPostEntity;
@@ -56,6 +57,7 @@ public class JobPostService {
     private final ModelOutputValidator validator;
     private final DuplicatePayloadBuilder duplicatePayloadBuilder;
     private final DashboardStore dashboardStore;
+    private final UserCompanyBlacklistRepository userCompanyBlacklistRepository;
     private final ObjectMapper mapper;
 
     public JobPostService(JobPostRepository jobPostRepository,
@@ -69,6 +71,7 @@ public class JobPostService {
                           ModelOutputValidator validator,
                           DuplicatePayloadBuilder duplicatePayloadBuilder,
                           DashboardStore dashboardStore,
+                          UserCompanyBlacklistRepository userCompanyBlacklistRepository,
                           ObjectMapper mapper) {
         this.jobPostRepository = jobPostRepository;
         this.jobMatchRepository = jobMatchRepository;
@@ -81,6 +84,7 @@ public class JobPostService {
         this.validator = validator;
         this.duplicatePayloadBuilder = duplicatePayloadBuilder;
         this.dashboardStore = dashboardStore;
+        this.userCompanyBlacklistRepository = userCompanyBlacklistRepository;
         this.mapper = mapper;
     }
 
@@ -147,6 +151,7 @@ public class JobPostService {
             parsedRange
         );
         List<String> finalRiskTags = safeList(ruleResult.riskTags());
+        boolean blacklisted = isBlacklisted(userId, source, defaultString(post.getCompany(), company));
         JobMatchEntity match = new JobMatchEntity(
             UUID.randomUUID().toString(),
             request.taskId(),
@@ -159,7 +164,10 @@ public class JobPostService {
         );
         jobMatchRepository.save(match);
 
-        if (score >= 70) {
+        boolean visibleRecommendation = ruleResult.hardFilterPass() && !blacklisted;
+        if (blacklisted) {
+            post.setStatus("ARCHIVED");
+        } else if (score >= 70 && visibleRecommendation) {
             post.setStatus(STATUS_SHORTLISTED);
         } else {
             post.setStatus(STATUS_ANALYZED);
@@ -175,10 +183,12 @@ public class JobPostService {
             analysis.riskTags(),
             post.getStatus()
         );
-        dashboardStore.addRecommendation(userId, recommendation);
+        if (visibleRecommendation) {
+            dashboardStore.addRecommendation(userId, recommendation);
+        }
 
         DraftItem draftItem = null;
-        if (isDetailPage(request) && Boolean.TRUE.equals(request.wantDraft())) {
+        if (visibleRecommendation && isDetailPage(request) && Boolean.TRUE.equals(request.wantDraft())) {
             draftItem = buildDraft(request, post, resume, extracted, userId);
         }
 
@@ -348,5 +358,16 @@ public class JobPostService {
         jobPost.put("raw_text", post.getJdRaw());
         jobPost.put("extracted_json", extracted);
         return jobPost;
+    }
+
+    private boolean isBlacklisted(String userId, String source, String company) {
+        if (userId == null || userId.isBlank() || source == null || source.isBlank() || company == null || company.isBlank()) {
+            return false;
+        }
+        return userCompanyBlacklistRepository.existsByUserIdAndCompanyNameIgnoreCaseAndSource(
+            userId,
+            company.trim(),
+            source.trim()
+        );
     }
 }

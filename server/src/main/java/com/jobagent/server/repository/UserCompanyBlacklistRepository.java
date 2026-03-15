@@ -7,4 +7,5 @@ import java.util.Optional;
 
 public interface UserCompanyBlacklistRepository extends JpaRepository<UserCompanyBlacklistEntity, String> {
     Optional<UserCompanyBlacklistEntity> findByUserIdAndCompanyNameAndSource(String userId, String companyName, String source);
+    boolean existsByUserIdAndCompanyNameIgnoreCaseAndSource(String userId, String companyName, String source);
 }
