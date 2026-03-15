@@ -210,14 +210,14 @@
 - Test: `worker/tests/test_task_parser.py`
 - Test: `web/tests/tasks.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖自然语言解析到 `title/city/salary/experience/exclude/preferences/automation_level`
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: worker 实现 `task_parser`
-- [ ] Step 4: server 接入结构化结果并保留原始 strategy
-- [ ] Step 5: 运行后端/worker 测试，确认通过
-- [ ] Step 6: 写 Web 失败测试，覆盖完整字段表单与自然语言辅助输入
-- [ ] Step 7: 改造任务页
-- [ ] Step 8: 运行 Web 测试，确认通过
+- [x] Step 1: 写失败测试，覆盖自然语言解析到 `title/city/salary/experience/exclude/preferences/automation_level`
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: worker 实现 `task_parser`
+- [x] Step 4: server 接入结构化结果并保留原始 strategy
+- [x] Step 5: 运行后端/worker 测试，确认通过
+- [x] Step 6: 写 Web 失败测试，覆盖完整字段表单与自然语言辅助输入
+- [x] Step 7: 改造任务页
+- [x] Step 8: 运行 Web 测试，确认通过
 - [ ] Step 9: 提交
 
 ### Task 4: Implement real hard filters and recommendation suppression

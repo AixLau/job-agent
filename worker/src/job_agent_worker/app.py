@@ -11,6 +11,7 @@ from job_agent_worker.models import (
     ResumeParseRequest,
     ReplyClassifyRequest,
 )
+from job_agent_worker.task_parser import parse_task_strategy
 
 app = FastAPI()
 
@@ -43,11 +44,7 @@ resume_parse_cache: Dict[str, Dict[str, Any]] = {}
 @app.post("/worker/goal-parse")
 def goal_parse(request: GoalParseRequest, _: str = Depends(require_worker_token)) -> Dict[str, Any]:
     def build() -> Dict[str, Any]:
-        text = request.strategy_text or ""
-        keywords = [token for token in re.split(r"\s+", text) if token]
-        if not keywords and text:
-            keywords = [text]
-        return {"strategy_json": {"keywords": keywords, "raw": text}}
+        return {"strategy_json": parse_task_strategy(request.strategy_text or "")}
 
     return cached_response(goal_parse_cache, request.idempotency_key, build)
 

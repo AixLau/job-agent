@@ -56,6 +56,31 @@ class TaskStoreTest {
         assertThat(config.get("automationLevel")).isEqualTo("AUTO");
     }
 
+    @Test
+    void createUsesStructuredStrategyFieldsWhenRequestFieldsMissing() throws Exception {
+        TaskCreateRequest request = new TaskCreateRequest(
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            List.of(),
+            null,
+            "上海 产品经理 20k-30k 3-5年 排除外包 偏好B端 AUTO"
+        );
+
+        var response = store.create(request, "user-1");
+        TaskEntity entity = repository.findById(response.id()).orElseThrow();
+
+        assertThat(entity.getTitle()).isEqualTo("产品经理");
+        assertThat(entity.getCity()).isEqualTo("上海");
+        assertThat(entity.getSalary()).isEqualTo("20k-30k");
+        assertThat(entity.getExperience()).isEqualTo("3-5年");
+        assertThat(entity.getAutomationLevel()).isEqualTo("AUTO");
+        assertThat(entity.getExcludeJson()).contains("外包");
+        assertThat(entity.getPreferencesJson()).contains("B端");
+    }
+
     @org.springframework.boot.test.context.TestConfiguration
     static class TestConfig {
 
@@ -90,6 +115,9 @@ class TaskStoreTest {
 
         @Override
         public String parse(String strategyText, String taskId) {
+            if (strategyText.contains("上海 产品经理")) {
+                return "{\"title\":\"产品经理\",\"city\":\"上海\",\"salary\":\"20k-30k\",\"experience\":\"3-5年\",\"automationLevel\":\"AUTO\",\"exclude\":[\"外包\"],\"preferences\":[\"B端\"],\"raw\":\"" + strategyText + "\"}";
+            }
             return "{\"salary\":\"20k\",\"experience\":\"3y\",\"automationLevel\":\"AUTO\"}";
         }
     }

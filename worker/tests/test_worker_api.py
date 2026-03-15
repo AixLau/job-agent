@@ -50,6 +50,27 @@ class WorkerApiTest(unittest.TestCase):
         self.assertEqual(payload["strategy_json"]["raw"], "focus 产品")
         self.assertIn("focus", payload["strategy_json"]["keywords"])
 
+    def test_goal_parse_returns_structured_task_fields(self):
+        response = self.client.post(
+            "/worker/goal-parse",
+            headers=self.headers,
+            json={
+                "task_id": "t-structured",
+                "stage": "GOAL_PARSE",
+                "strategy_text": "上海 产品经理 20k-30k 3-5年 排除外包 偏好B端 AUTO",
+                "idempotency_key": "goal-structured"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["strategy_json"]["title"], "产品经理")
+        self.assertEqual(payload["strategy_json"]["city"], "上海")
+        self.assertEqual(payload["strategy_json"]["salary"], "20k-30k")
+        self.assertEqual(payload["strategy_json"]["experience"], "3-5年")
+        self.assertEqual(payload["strategy_json"]["automationLevel"], "AUTO")
+        self.assertIn("外包", payload["strategy_json"]["exclude"])
+        self.assertIn("B端", payload["strategy_json"]["preferences"])
+
     def test_job_match(self):
         response = self.client.post(
             "/worker/job-match",
