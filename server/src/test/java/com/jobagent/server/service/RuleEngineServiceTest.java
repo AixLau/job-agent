@@ -51,4 +51,28 @@ class RuleEngineServiceTest {
         assertThat(range.experience().min()).isEqualTo(5);
         assertThat(range.experience().max()).isEqualTo(7);
     }
+
+    @Test
+    void resolveParsedRangeFallsBackWhenParsedJobMissingRanges() {
+        RuleEngineService service = new RuleEngineService(
+            new SalaryParser(),
+            new ExperienceParser(),
+            new RiskRuleSet(),
+            new AutomationPolicy(),
+            new RuleConfigParser(new ObjectMapper())
+        );
+
+        Map<String, Object> parsedJob = new java.util.HashMap<>();
+        parsedJob.put("salary_min", null);
+        parsedJob.put("salary_max", null);
+        parsedJob.put("exp_min", null);
+        parsedJob.put("exp_max", null);
+
+        RuleResult.ParsedRange range = service.resolveParsedRange(parsedJob, "20-30k", "3-5年", "raw");
+
+        assertThat(range.salary().min()).isEqualTo(20000);
+        assertThat(range.salary().max()).isEqualTo(30000);
+        assertThat(range.experience().min()).isEqualTo(3);
+        assertThat(range.experience().max()).isEqualTo(5);
+    }
 }

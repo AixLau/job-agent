@@ -71,15 +71,15 @@ public class RuleEngineService {
                                                      String experienceText,
                                                      String rawText) {
         if (parsedJob != null && !parsedJob.isEmpty()) {
-            RuleResult.Range salary = new RuleResult.Range(
-                readInt(parsedJob, "salary_min", "salaryMin"),
-                readInt(parsedJob, "salary_max", "salaryMax")
-            );
-            RuleResult.Range experience = new RuleResult.Range(
-                readInt(parsedJob, "exp_min", "expMin", "experience_min", "experienceMin"),
-                readInt(parsedJob, "exp_max", "expMax", "experience_max", "experienceMax")
-            );
-            return new RuleResult.ParsedRange(salary, experience);
+            Integer salaryMin = readInt(parsedJob, "salary_min", "salaryMin");
+            Integer salaryMax = readInt(parsedJob, "salary_max", "salaryMax");
+            Integer expMin = readInt(parsedJob, "exp_min", "expMin", "experience_min", "experienceMin");
+            Integer expMax = readInt(parsedJob, "exp_max", "expMax", "experience_max", "experienceMax");
+            if (salaryMin != null || salaryMax != null || expMin != null || expMax != null) {
+                RuleResult.Range salary = new RuleResult.Range(salaryMin, salaryMax);
+                RuleResult.Range experience = new RuleResult.Range(expMin, expMax);
+                return new RuleResult.ParsedRange(salary, experience);
+            }
         }
         String salarySource = firstNonBlank(salaryText, rawText);
         String experienceSource = firstNonBlank(experienceText, rawText);
