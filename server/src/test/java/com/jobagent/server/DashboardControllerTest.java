@@ -10,6 +10,7 @@ import com.jobagent.server.repository.DashboardRecommendationRepository;
 import com.jobagent.server.repository.DashboardReplyRepository;
 import com.jobagent.server.repository.ConversationRepository;
 import com.jobagent.server.repository.JobPostRepository;
+import com.jobagent.server.repository.MessageDraftRepository;
 import com.jobagent.server.repository.UserRepository;
 import com.jobagent.server.store.DashboardStore;
 import com.jobagent.server.store.ConversationEntity;
@@ -60,6 +61,9 @@ class DashboardControllerTest {
 
     @Autowired
     private JobPostRepository jobPostRepository;
+
+    @Autowired
+    private MessageDraftRepository messageDraftRepository;
 
     @Test
     void dashboard_snapshot_returns_metrics_and_lists() throws Exception {
@@ -274,6 +278,7 @@ class DashboardControllerTest {
     }
 
     private void resetData() {
+        messageDraftRepository.deleteAll();
         conversationRepository.deleteAll();
         jobPostRepository.deleteAll();
         replyRepository.deleteAll();

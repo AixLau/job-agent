@@ -456,13 +456,17 @@
 - Verify only: `extension/**`
 - Modify if needed: `docs/superpowers/plans/2026-03-15-remaining-gap-closure-plan.md`
 
-- [ ] Step 1: 逐条对照本计划与原始缺口清单，记录剩余问题
-- [ ] Step 2: 运行 `cd server && mvn -Dmaven.repo.local=/Users/lushiwu/dev/apache-maven-3.9.4/rep test`
-- [ ] Step 3: 运行 `PYTHONPATH=worker/src python3 -m unittest worker/tests/test_worker_api.py worker/tests/test_task_parser.py worker/tests/test_follow_up.py`
-- [ ] Step 4: 运行 `cd web && node --test tests/*.mjs`
-- [ ] Step 5: 运行 `cd extension && node --test tests/*.mjs`
-- [ ] Step 6: 若有新增缺口，写回本计划并补做实现
-- [ ] Step 7: 所有缺口关闭后再允许结束任务
+回归结果：
+- 无新增产品缺口
+- 修复了一处测试隔离问题：`DashboardControllerTest` 未清理 `message_drafts`，导致全量回归时面试草稿断言被脏数据污染
+
+- [x] Step 1: 逐条对照本计划与原始缺口清单，记录剩余问题
+- [x] Step 2: 运行 `cd server && mvn -Dmaven.repo.local=/Users/lushiwu/dev/apache-maven-3.9.4/rep test`
+- [x] Step 3: 运行 `PYTHONPATH=worker/src python3 -m unittest worker/tests/test_worker_api.py worker/tests/test_task_parser.py worker/tests/test_follow_up.py`
+- [x] Step 4: 运行 `cd web && node --test tests/*.mjs`
+- [x] Step 5: 运行 `cd extension && node --test tests/*.mjs`
+- [x] Step 6: 若有新增缺口，写回本计划并补做实现
+- [x] Step 7: 所有缺口关闭后再允许结束任务
 
 ---
 
