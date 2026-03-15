@@ -3,10 +3,13 @@
   "name": "Job Agent",
   "version": "0.1.0",
   "description": "Job Agent MVP for Boss Zhipin",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "alarms", "sidePanel"],
   "host_permissions": ["https://*.zhipin.com/*", "http://localhost:8080/*"],
   "background": {
     "service_worker": "src/background.js"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel.html"
   },
   "action": {
     "default_title": "Job Agent",

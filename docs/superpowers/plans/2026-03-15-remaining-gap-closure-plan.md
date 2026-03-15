@@ -307,7 +307,7 @@
 - [x] Step 2: 运行测试，确认失败
 - [x] Step 3: 打通 worker → server → dashboard → web 页面链路
 - [x] Step 4: 运行测试，确认通过
-- [ ] Step 5: 提交
+- [x] Step 5: 提交
 
 ### Task 8: Add multi-turn reply strategy and auto follow-up suggestion
 
@@ -328,7 +328,7 @@
 - [x] Step 4: 实现 server 状态机与 reply list API
 - [x] Step 5: 实现 Web 待处理回复页
 - [x] Step 6: 运行测试，确认通过
-- [ ] Step 7: 提交
+- [x] Step 7: 提交
 
 ### Task 9: Add minimal multi-agent orchestration hooks
 
@@ -345,7 +345,7 @@
 - [x] Step 2: 运行测试，确认失败
 - [x] Step 3: 用当前架构实现最小并行编排接口，不引入大重构
 - [x] Step 4: 运行测试，确认通过
-- [ ] Step 5: 提交
+- [x] Step 5: 提交
 
 ---
 
@@ -405,11 +405,11 @@
 - Modify: `extension/src/popup.js`
 - Test: `extension/tests/sidepanel.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖 side panel 状态同步与任务状态展示
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 实现 side panel 与后台同步
-- [ ] Step 4: 运行测试，确认通过
-- [ ] Step 5: 提交
+- [x] Step 1: 写失败测试，覆盖 side panel 状态同步与任务状态展示
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 实现 side panel 与后台同步
+- [x] Step 4: 运行测试，确认通过
+- [x] Step 5: 提交
 
 ### Task 13: Componentize draft confirmation and automation control
 
@@ -421,12 +421,12 @@
 - Test: `extension/tests/ui.test.mjs`
 - Test: `extension/tests/api.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖独立草稿确认框、风险说明、终止按钮、解释说明
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 重构 overlay 为独立确认组件
-- [ ] Step 4: 补齐自动化动作“可见、可解释、可终止”
-- [ ] Step 5: 运行测试，确认通过
-- [ ] Step 6: 提交
+- [x] Step 1: 写失败测试，覆盖独立草稿确认框、风险说明、终止按钮、解释说明
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 重构 overlay 为独立确认组件
+- [x] Step 4: 补齐自动化动作“可见、可解释、可终止”
+- [x] Step 5: 运行测试，确认通过
+- [x] Step 6: 提交
 
 ### Task 14: Extend chat execution for interview and follow-up
 
@@ -437,11 +437,11 @@
 - Test: `extension/tests/ui.test.mjs`
 - Test: `extension/tests/api.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖面试邀约草稿、自动跟进草稿、暂停/恢复行为
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 扩展聊天页执行逻辑
-- [ ] Step 4: 运行测试，确认通过
-- [ ] Step 5: 提交
+- [x] Step 1: 写失败测试，覆盖面试邀约草稿、自动跟进草稿、暂停/恢复行为
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 扩展聊天页执行逻辑
+- [x] Step 4: 运行测试，确认通过
+- [x] Step 5: 提交
 
 ---
 

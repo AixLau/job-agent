@@ -17,6 +17,36 @@ test("buildOverlayHtml includes score", () => {
   assert.ok(html.includes("80"));
 });
 
+test("buildOverlayHtml exposes confirm, send and pause controls", () => {
+  const html = buildOverlayHtml({
+    score: 92,
+    reasons: ["匹配度高"],
+    risks: ["高风险"],
+    reply: { intent: "INTERVIEW", next_action: "确认面试时间" },
+    draft: { content: "你好，我可以参加下午的面试。" },
+    auto_send: false,
+    requiresReview: true,
+  });
+
+  assert.ok(html.includes('data-action="fill"'));
+  assert.ok(html.includes('data-action="send"'));
+  assert.ok(html.includes('data-action="pause"'));
+  assert.ok(html.includes("高风险需人工确认"));
+});
+
+test("buildOverlayHtml accepts snake_case automation fields", () => {
+  const html = buildOverlayHtml({
+    score: 88,
+    reasons: ["适合自动发送"],
+    risks: [],
+    draft: { content: "你好，我想进一步了解岗位情况。" },
+    auto_send: true,
+    requires_review: true,
+  });
+
+  assert.ok(html.includes("高风险需人工确认"));
+});
+
 test("buildOverlayHtml escapes html content", () => {
   const html = buildOverlayHtml({
     score: "<img onerror=alert(1)>",
@@ -94,5 +124,25 @@ test("auto send reports FAILED when cannot send", async () => {
   assert.deepEqual(
     reports.map((item) => item.action_type),
     ["FAILED"]
+  );
+});
+
+test("auto send returns review_required when draft must be confirmed manually", async () => {
+  const reports = [];
+  const result = await performAutoSend({
+    draftText: "需要人工确认",
+    inputEl: { value: "", dispatchEvent: () => {} },
+    sendButtonEl: { click() {} },
+    requiresReview: true,
+    reportAction: async (payload) => {
+      reports.push(payload);
+    },
+    taskId: "task-2",
+  });
+
+  assert.equal(result.status, "review_required");
+  assert.deepEqual(
+    reports.map((item) => item.action_type),
+    ["REVIEW_REQUIRED"]
   );
 });

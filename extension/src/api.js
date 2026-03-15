@@ -50,7 +50,15 @@ const fetchJson = async (url, options) => {
     error.status = response.status;
     throw error;
   }
-  return response.json();
+  const rawText = typeof response.text === "function" ? await response.text() : "";
+  if (!rawText) {
+    return null;
+  }
+  try {
+    return JSON.parse(rawText);
+  } catch (_error) {
+    return rawText;
+  }
 };
 
 const loginAndStoreToken = async (account, password) => {
@@ -119,6 +127,18 @@ const buildHeartbeatPayload = ({ user_id, task_id, tab_id, status, ts }) => ({
   ts: ts || Date.now(),
 });
 
+const buildAssistantState = (response = {}) => {
+  const hasDraft = Boolean(response?.draft?.content || response?.draft);
+  const autoSend = Boolean(response?.auto_send || response?.autoSend);
+  return {
+    mode: autoSend ? "auto_send" : hasDraft ? "confirm" : "idle",
+    hasDraft,
+    autoSend,
+    intent: response?.reply?.intent || "",
+    requiresReview: Boolean(response?.requires_review || response?.requiresReview),
+  };
+};
+
 const postHeartbeat = async (payload, pluginToken) => {
   if (!pluginToken) {
     return null;
@@ -132,12 +152,14 @@ const postHeartbeat = async (payload, pluginToken) => {
 
 const api = {
   buildAuthHeaders,
+  fetchJson,
   getBrowserId,
   loginAndStoreToken,
   postPageReport,
   postChatReport,
   postActionReport,
   buildHeartbeatPayload,
+  buildAssistantState,
   postHeartbeat,
 };
 
