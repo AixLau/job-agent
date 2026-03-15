@@ -29,8 +29,13 @@ public class ResumeStore {
     public ResumeResponse save(ResumeRequest request, String userId) {
         String id = UUID.randomUUID().toString();
         Map<String, Object> parsed = Map.of("content", request.content());
+        return saveParsed(userId, request.content(), parsed);
+    }
+
+    public ResumeResponse saveParsed(String userId, String content, Map<String, Object> parsed) {
+        String id = UUID.randomUUID().toString();
         String parsedJson = writeParsedJson(parsed);
-        ResumeEntity entity = new ResumeEntity(id, userId, request.content(), parsedJson);
+        ResumeEntity entity = new ResumeEntity(id, userId, content, parsedJson);
         repository.save(entity);
         return new ResumeResponse(new ResumeResponse.ResumePayload(id, parsed, entity.getCreatedAt()));
     }

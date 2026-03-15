@@ -180,6 +180,24 @@ class WorkerApiTest(unittest.TestCase):
         self.assertTrue(payload["summary"])
         self.assertTrue(payload["next_action"])
 
+    def test_resume_parse_returns_preview_fields(self):
+        response = self.client.post(
+            "/worker/resume-parse",
+            headers=self.headers,
+            json={
+                "content": "Alice Zhang\nProduct Manager\n5 years",
+                "format": "PDF",
+                "file_name": "resume.pdf",
+                "source": "upload",
+                "idempotency_key": "resume-1"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["parsed_json"]["file_name"], "resume.pdf")
+        self.assertEqual(payload["parsed_json"]["format"], "PDF")
+        self.assertEqual(payload["parsed_json"]["raw_text"], "Alice Zhang\nProduct Manager\n5 years")
+
 
 if __name__ == "__main__":
     unittest.main()

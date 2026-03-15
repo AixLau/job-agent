@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -34,4 +34,12 @@ class ReplyClassifyRequest(BaseModel):
     conversation: Dict[str, Any]
     messages: List[Dict[str, Any]]
     last_message_id: str
+    idempotency_key: str
+
+
+class ResumeParseRequest(BaseModel):
+    content: str
+    format: str
+    file_name: Optional[str] = None
+    source: Optional[str] = None
     idempotency_key: str

@@ -179,15 +179,15 @@
 - Test: `worker/tests/test_worker_api.py`
 - Test: `web/tests/resume.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖 `TEXT/PDF/DOCX` 元数据、解析预览、确认入库
-- [ ] Step 2: 运行后端/worker 测试，确认失败
-- [ ] Step 3: 为后端增加“解析预览 + 确认保存”接口
-- [ ] Step 4: 为 worker 增加简历解析契约，先做 MVP 解析字段
-- [ ] Step 5: 运行后端/worker 测试，确认通过
-- [ ] Step 6: 写 Web 失败测试，覆盖文件选择、解析预览、确认保存
-- [ ] Step 7: 改造 `resume` 页面支持文件和解析确认
-- [ ] Step 8: 运行 Web 测试，确认通过
-- [ ] Step 9: 提交
+- [x] Step 1: 写失败测试，覆盖 `TEXT/PDF/DOCX` 元数据、解析预览、确认入库
+- [x] Step 2: 运行后端/worker 测试，确认失败
+- [x] Step 3: 为后端增加“解析预览 + 确认保存”接口
+- [x] Step 4: 为 worker 增加简历解析契约，先做 MVP 解析字段
+- [x] Step 5: 运行后端/worker 测试，确认通过
+- [x] Step 6: 写 Web 失败测试，覆盖文件选择、解析预览、确认保存
+- [x] Step 7: 改造 `resume` 页面支持文件和解析确认
+- [x] Step 8: 运行 Web 测试，确认通过
+- [x] Step 9: 提交
 
 ---
 

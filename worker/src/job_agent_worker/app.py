@@ -8,6 +8,7 @@ from job_agent_worker.models import (
     DraftRequest,
     GoalParseRequest,
     JobMatchRequest,
+    ResumeParseRequest,
     ReplyClassifyRequest,
 )
 
@@ -36,6 +37,7 @@ goal_parse_cache: Dict[str, Dict[str, Any]] = {}
 job_match_cache: Dict[str, Dict[str, Any]] = {}
 draft_cache: Dict[str, Dict[str, Any]] = {}
 reply_cache: Dict[str, Dict[str, Any]] = {}
+resume_parse_cache: Dict[str, Dict[str, Any]] = {}
 
 
 @app.post("/worker/goal-parse")
@@ -110,6 +112,27 @@ def reply_classify(
         return {"intent": intent, "summary": summary, "next_action": next_action}
 
     return cached_response(reply_cache, request.idempotency_key, build)
+
+
+@app.post("/worker/resume-parse")
+def resume_parse(request: ResumeParseRequest, _: str = Depends(require_worker_token)) -> Dict[str, Any]:
+    def build() -> Dict[str, Any]:
+        parsed_json = {
+            "raw_text": request.content,
+            "format": request.format,
+        }
+        if request.file_name:
+            parsed_json["file_name"] = request.file_name
+        if request.source:
+            parsed_json["source"] = request.source
+        lines = request.content.splitlines()
+        if lines:
+            parsed_json["candidate_name"] = lines[0]
+        if len(lines) > 1:
+            parsed_json["headline"] = lines[1]
+        return {"parsed_json": parsed_json}
+
+    return cached_response(resume_parse_cache, request.idempotency_key, build)
 
 
 def extract_last_message_text(messages: List[Dict[str, Any]], last_message_id: str) -> str:

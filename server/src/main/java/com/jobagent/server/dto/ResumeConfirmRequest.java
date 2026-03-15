@@ -2,9 +2,12 @@ package com.jobagent.server.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record ResumeRequest(
+import java.util.Map;
+
+public record ResumeConfirmRequest(
     @NotBlank String content,
     @NotBlank String format,
     String source,
-    String fileName
+    String fileName,
+    Map<String, Object> parsedJson
 ) {}
