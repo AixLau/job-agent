@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
     TaskController.class,
     ResumeController.class,
     DashboardController.class,
+    JobActionController.class,
     DraftController.class,
     ConversationController.class
 })
