@@ -3,8 +3,10 @@ package com.jobagent.server.repository;
 import com.jobagent.server.store.MessageDraftEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface MessageDraftRepository extends JpaRepository<MessageDraftEntity, String> {
     Optional<MessageDraftEntity> findByConversationIdAndSourceType(String conversationId, String sourceType);
+    long deleteByCreatedAtBefore(Instant cutoff);
 }

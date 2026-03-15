@@ -31,11 +31,15 @@ public class AuditLogEntity {
     }
 
     public AuditLogEntity(String id, String userId, String actionType, String payload) {
+        this(id, userId, actionType, payload, Instant.now());
+    }
+
+    public AuditLogEntity(String id, String userId, String actionType, String payload, Instant createdAt) {
         this.id = id;
         this.userId = userId;
         this.actionType = actionType;
         this.payload = payload;
-        this.createdAt = Instant.now();
+        this.createdAt = createdAt == null ? Instant.now() : createdAt;
     }
 
     @PrePersist
