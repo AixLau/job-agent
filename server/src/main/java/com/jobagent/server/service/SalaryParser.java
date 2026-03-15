@@ -20,13 +20,17 @@ public class SalaryParser {
         if (normalized.contains(NEGOTIABLE)) {
             return emptyRange();
         }
+        int multiplier = normalized.toLowerCase().contains("k") ? 1000 : 1;
         Matcher range = RANGE_PATTERN.matcher(normalized);
         if (range.find()) {
-            return new RuleResult.Range(parseInt(range.group(1)), parseInt(range.group(2)));
+            return new RuleResult.Range(
+                scale(parseInt(range.group(1)), multiplier),
+                scale(parseInt(range.group(2)), multiplier)
+            );
         }
         Matcher plus = PLUS_PATTERN.matcher(normalized);
         if (plus.find()) {
-            return new RuleResult.Range(parseInt(plus.group(1)), null);
+            return new RuleResult.Range(scale(parseInt(plus.group(1)), multiplier), null);
         }
         return emptyRange();
     }
@@ -41,5 +45,12 @@ public class SalaryParser {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private Integer scale(Integer value, int multiplier) {
+        if (value == null) {
+            return null;
+        }
+        return value * multiplier;
     }
 }
