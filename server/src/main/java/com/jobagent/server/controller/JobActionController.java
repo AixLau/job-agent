@@ -143,9 +143,12 @@ public class JobActionController {
                 actionType,
                 now
             ));
+        boolean sameAction = actionType.equals(entity.getActionType());
         entity.setSource(jobPost.getSource());
         entity.setActionType(actionType);
-        entity.setCreatedAt(now);
+        if (!sameAction) {
+            entity.setCreatedAt(now);
+        }
         return userJobActionRepository.save(entity);
     }
 

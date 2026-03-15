@@ -103,6 +103,34 @@ class JobActionControllerTest {
     }
 
     @Test
+    void repeated_follow_keeps_original_created_at() throws Exception {
+        String token = registerAndLogin("alice");
+        UserEntity user = userRepository.findByAccount("alice").orElseThrow();
+        TaskEntity task = createTask(user.getId());
+        JobPostEntity post = createJobPost(task.getId(), "Boss1", "Company A");
+
+        mockMvc.perform(post("/api/jobs/" + post.getId() + "/follow")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+
+        Instant createdAt = userJobActionRepository.findByUserIdAndJobPostId(user.getId(), post.getId())
+            .orElseThrow()
+            .getCreatedAt();
+
+        Thread.sleep(5);
+
+        mockMvc.perform(post("/api/jobs/" + post.getId() + "/follow")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+
+        Instant updatedCreatedAt = userJobActionRepository.findByUserIdAndJobPostId(user.getId(), post.getId())
+            .orElseThrow()
+            .getCreatedAt();
+
+        assertThat(updatedCreatedAt).isEqualTo(createdAt);
+    }
+
+    @Test
     void follow_list_is_paginated_and_ordered() throws Exception {
         String token = registerAndLogin("alice");
         UserEntity user = userRepository.findByAccount("alice").orElseThrow();
