@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
     ResumeController.class,
     DashboardController.class,
     JobActionController.class,
+    AuditController.class,
     DraftController.class,
     ConversationController.class
 })
