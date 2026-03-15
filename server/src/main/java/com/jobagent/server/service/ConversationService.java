@@ -1,5 +1,7 @@
 package com.jobagent.server.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.ActionHint;
 import com.jobagent.server.dto.ActionReportRequest;
 import com.jobagent.server.dto.ChatReportRequest;
@@ -17,6 +19,7 @@ import com.jobagent.server.dto.ReplyResult;
 import com.jobagent.server.dto.WorkerReplyClassifyRequest;
 import com.jobagent.server.dto.WorkerReplyClassifyResponse;
 import com.jobagent.server.repository.ConversationRepository;
+import com.jobagent.server.repository.JobMatchRepository;
 import com.jobagent.server.repository.JobPostRepository;
 import com.jobagent.server.repository.MessageDraftRepository;
 import com.jobagent.server.repository.MessageRepository;
@@ -50,6 +53,7 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
+    private final JobMatchRepository jobMatchRepository;
     private final JobPostRepository jobPostRepository;
     private final MessageDraftRepository messageDraftRepository;
     private final TaskRepository taskRepository;
@@ -57,18 +61,22 @@ public class ConversationService {
     private final ModelOutputValidator validator;
     private final DuplicatePayloadBuilder duplicatePayloadBuilder;
     private final DashboardStore dashboardStore;
+    private final ObjectMapper objectMapper;
 
     public ConversationService(ConversationRepository conversationRepository,
                                MessageRepository messageRepository,
+                               JobMatchRepository jobMatchRepository,
                                JobPostRepository jobPostRepository,
                                MessageDraftRepository messageDraftRepository,
                                TaskRepository taskRepository,
                                WorkerClient workerClient,
                                ModelOutputValidator validator,
                                DuplicatePayloadBuilder duplicatePayloadBuilder,
-                               DashboardStore dashboardStore) {
+                               DashboardStore dashboardStore,
+                               ObjectMapper objectMapper) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
+        this.jobMatchRepository = jobMatchRepository;
         this.jobPostRepository = jobPostRepository;
         this.messageDraftRepository = messageDraftRepository;
         this.taskRepository = taskRepository;
@@ -76,10 +84,11 @@ public class ConversationService {
         this.validator = validator;
         this.duplicatePayloadBuilder = duplicatePayloadBuilder;
         this.dashboardStore = dashboardStore;
+        this.objectMapper = objectMapper;
     }
 
     public ChatReportResponse handleChatReport(ChatReportRequest request, String userId) {
-        requireTaskOwned(request.taskId(), userId);
+        var task = requireTaskOwned(request.taskId(), userId);
         ConversationEntity conversation = conversationRepository
             .findByTaskIdAndExternalId(request.taskId(), request.conversationId())
             .orElseGet(() -> new ConversationEntity(
@@ -129,7 +138,14 @@ public class ConversationService {
             Instant.now()
         ));
 
-        return new ChatReportResponse("ok", reply);
+        MessageDraftEntity draftEntity = messageDraftRepository.findByConversationIdAndSourceType(
+            conversation.getId(),
+            SOURCE_TYPE_SYSTEM
+        ).orElse(null);
+        DraftContent draftContent = draftEntity == null ? null : new DraftContent(defaultString(draftEntity.getContent(), ""));
+        boolean autoSend = draftContent != null && isAutoSendAllowed(task, conversation);
+        ActionHint actionHint = draftContent == null ? null : new ActionHint(draftContent.content());
+        return new ChatReportResponse("ok", reply, autoSend, draftContent, actionHint);
     }
 
     public ConversationDetailResponse detail(String conversationId, String userId) {
@@ -303,9 +319,31 @@ public class ConversationService {
         return conversation;
     }
 
-    private void requireTaskOwned(String taskId, String userId) {
-        taskRepository.findByIdAndUserId(taskId, userId)
+    private com.jobagent.server.store.TaskEntity requireTaskOwned(String taskId, String userId) {
+        return taskRepository.findByIdAndUserId(taskId, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "task not found"));
+    }
+
+    private boolean isAutoSendAllowed(com.jobagent.server.store.TaskEntity task, ConversationEntity conversation) {
+        if (task == null || !"AUTO".equalsIgnoreCase(defaultString(task.getAutomationLevel(), ""))) {
+            return false;
+        }
+        if (conversation.getJobPostId() == null || conversation.getJobPostId().isBlank()) {
+            return false;
+        }
+        return readRiskTags(task.getId(), conversation.getJobPostId()).isEmpty();
+    }
+
+    private List<String> readRiskTags(String taskId, String jobPostId) {
+        var match = jobMatchRepository.findByTaskIdAndJobPostId(taskId, jobPostId).orElse(null);
+        if (match == null || match.getRiskTagsJson() == null || match.getRiskTagsJson().isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(match.getRiskTagsJson(), new TypeReference<>() {});
+        } catch (Exception ex) {
+            return List.of();
+        }
     }
 
     private ConversationSummary toSummary(ConversationEntity conversation) {

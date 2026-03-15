@@ -53,7 +53,7 @@ public class DuplicatePayloadBuilder {
             conversation.getLastSummary(),
             conversation.getLastAction()
         );
-        return new ChatReportResponse("ok", reply);
+        return new ChatReportResponse("ok", reply, false, null, null);
     }
 
     private List<String> readList(String json) {

@@ -14,6 +14,9 @@ import com.jobagent.server.repository.ResumeRepository;
 import com.jobagent.server.repository.TaskRepository;
 import com.jobagent.server.service.WorkerClient;
 import com.jobagent.server.store.ConversationEntity;
+import com.jobagent.server.store.JobMatchEntity;
+import com.jobagent.server.store.JobPostEntity;
+import com.jobagent.server.store.MessageDraftEntity;
 import com.jobagent.server.store.PluginTokenEntity;
 import com.jobagent.server.store.ResumeEntity;
 import com.jobagent.server.store.TaskEntity;
@@ -245,7 +248,8 @@ class PluginGatewayControllerTest {
                 .content(chatBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ok"))
-            .andExpect(jsonPath("$.reply.intent").value("INTERVIEW"));
+            .andExpect(jsonPath("$.reply.intent").value("INTERVIEW"))
+            .andExpect(jsonPath("$.auto_send").value(false));
 
         String actionBody = mapper.writeValueAsString(Map.of(
             "task_id", "task-1",
@@ -296,6 +300,150 @@ class PluginGatewayControllerTest {
 
         ConversationEntity updated = conversationRepository.findById(conversation.getId()).orElseThrow();
         org.assertj.core.api.Assertions.assertThat(updated.getStatus()).isEqualTo("WAITING_HR");
+    }
+
+    @Test
+    void chat_report_returns_auto_send_hint_when_allowed() throws Exception {
+        resetData();
+        seedTokenAndTask("AUTO");
+
+        JobPostEntity jobPost = new JobPostEntity(
+            "job-1",
+            "task-1",
+            "boss",
+            "ext-1",
+            "Role A",
+            "Company A",
+            "Shanghai",
+            "20k-30k",
+            "3y",
+            "raw",
+            "{}",
+            "DRAFTED",
+            Instant.now()
+        );
+        jobPostRepository.save(jobPost);
+        jobMatchRepository.save(new JobMatchEntity(
+            "match-1",
+            "task-1",
+            "job-1",
+            80,
+            "[\"fit\"]",
+            "[]",
+            "{\"automation_action\":\"AUTO_SEND\"}",
+            Instant.now()
+        ));
+
+        ConversationEntity conversation = new ConversationEntity(
+            UUID.randomUUID().toString(),
+            "task-1",
+            "job-1",
+            "conv-auto",
+            "WAITING_USER",
+            null,
+            null,
+            null,
+            null
+        );
+        conversationRepository.save(conversation);
+        messageDraftRepository.save(new MessageDraftEntity(
+            "draft-auto",
+            conversation.getId(),
+            "自动发送草稿",
+            "SYSTEM",
+            false,
+            Instant.now()
+        ));
+
+        when(workerClient.replyClassify(any()))
+            .thenReturn(new WorkerReplyClassifyResponse("FOLLOW_UP", "summary", "next"));
+
+        String chatBody = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "conversation_id", "conv-auto",
+            "messages", List.of(Map.of("id", "m1", "role", "hr", "text", "hello")),
+            "last_message_id", "m1"
+        ));
+
+        mockMvc.perform(post("/plugin/chat/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(chatBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.auto_send").value(true))
+            .andExpect(jsonPath("$.draft.content").value("自动发送草稿"));
+    }
+
+    @Test
+    void chat_report_auto_send_false_for_high_risk_or_non_auto() throws Exception {
+        resetData();
+        seedTokenAndTask("SEMI");
+
+        JobPostEntity jobPost = new JobPostEntity(
+            "job-2",
+            "task-1",
+            "boss",
+            "ext-2",
+            "Role B",
+            "Company B",
+            "Shanghai",
+            "20k-30k",
+            "3y",
+            "raw",
+            "{}",
+            "DRAFTED",
+            Instant.now()
+        );
+        jobPostRepository.save(jobPost);
+        jobMatchRepository.save(new JobMatchEntity(
+            "match-2",
+            "task-1",
+            "job-2",
+            70,
+            "[\"fit\"]",
+            "[\"外包\"]",
+            "{\"automation_action\":\"NEED_CONFIRM\"}",
+            Instant.now()
+        ));
+
+        ConversationEntity conversation = new ConversationEntity(
+            UUID.randomUUID().toString(),
+            "task-1",
+            "job-2",
+            "conv-manual",
+            "WAITING_USER",
+            null,
+            null,
+            null,
+            null
+        );
+        conversationRepository.save(conversation);
+        messageDraftRepository.save(new MessageDraftEntity(
+            "draft-manual",
+            conversation.getId(),
+            "人工确认草稿",
+            "SYSTEM",
+            false,
+            Instant.now()
+        ));
+
+        when(workerClient.replyClassify(any()))
+            .thenReturn(new WorkerReplyClassifyResponse("FOLLOW_UP", "summary", "next"));
+
+        String chatBody = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "conversation_id", "conv-manual",
+            "messages", List.of(Map.of("id", "m1", "role", "hr", "text", "hello")),
+            "last_message_id", "m1"
+        ));
+
+        mockMvc.perform(post("/plugin/chat/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(chatBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.auto_send").value(false))
+            .andExpect(jsonPath("$.draft.content").value("人工确认草稿"));
     }
 
     @Test
@@ -360,6 +508,10 @@ class PluginGatewayControllerTest {
     }
 
     private void seedTokenAndTask() {
+        seedTokenAndTask("SEMI");
+    }
+
+    private void seedTokenAndTask(String automationLevel) {
         pluginTokenRepository.save(new PluginTokenEntity(
             UUID.randomUUID().toString(),
             "user-1",
@@ -375,7 +527,7 @@ class PluginGatewayControllerTest {
             "Shanghai",
             "20k-30k",
             "3y",
-            "SEMI",
+            automationLevel,
             "ACTIVE",
             "{\"goal\":\"x\"}",
             "{}",
