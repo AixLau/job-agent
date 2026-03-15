@@ -79,7 +79,7 @@ const loginAndStoreToken = async (account, password) => {
     throw new Error("Missing plugin token");
   }
   if (chrome?.storage?.local) {
-    chrome.storage.local.set({ plugin_token: pluginToken });
+    chrome.storage.local.set({ plugin_token: pluginToken, user_id: account });
   }
   return pluginToken;
 };
@@ -102,6 +102,23 @@ const postChatReport = async (payload) => {
   });
 };
 
+const postActionReport = async (payload) => {
+  const pluginToken = await readPluginToken();
+  return fetchJson(`${API_BASE}/plugin/action/report`, {
+    method: "POST",
+    headers: buildAuthHeaders(pluginToken),
+    body: JSON.stringify(payload),
+  });
+};
+
+const buildHeartbeatPayload = ({ user_id, task_id, tab_id, status, ts }) => ({
+  user_id: user_id || "unknown",
+  task_id: task_id || "demo-task",
+  tab_id: tab_id || "background",
+  status: status || "active",
+  ts: ts || Date.now(),
+});
+
 const postHeartbeat = async (payload, pluginToken) => {
   if (!pluginToken) {
     return null;
@@ -119,6 +136,8 @@ const api = {
   loginAndStoreToken,
   postPageReport,
   postChatReport,
+  postActionReport,
+  buildHeartbeatPayload,
   postHeartbeat,
 };
 

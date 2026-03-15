@@ -9,7 +9,7 @@ const {
   extractChatMessages,
   hashText,
 } = extractor;
-const { buildOverlayHtml } = window.JobAgentUI || {};
+const { buildOverlayHtml, performAutoSend } = window.JobAgentUI || {};
 
 const extractText = () => {
   const raw = document.body?.innerText ?? "";
@@ -43,6 +43,13 @@ const getTaskId = () =>
   new Promise((resolve) => {
     chrome.storage.local.get(["task_id"], (result) => {
       resolve(result?.task_id || "demo-task");
+    });
+  });
+
+const isAutomationPaused = () =>
+  new Promise((resolve) => {
+    chrome.storage.local.get(["automation_paused"], (result) => {
+      resolve(Boolean(result?.automation_paused));
     });
   });
 
@@ -99,6 +106,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ status: "ok" });
     return true;
   }
+  if (message?.type === "AUTO_SEND") {
+    handleAutoSend(message.payload || {})
+      .then(() => sendResponse({ status: "ok" }))
+      .catch(() => sendResponse({ status: "failed" }));
+    return true;
+  }
   return false;
 });
 
@@ -142,5 +155,50 @@ const fillDraftIntoPage = (text) => {
   if (editable) {
     editable.textContent = text;
     editable.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+};
+
+const findDraftInput = () =>
+  document.querySelector("textarea") ||
+  document.querySelector("[contenteditable='true']");
+
+const findSendButton = () =>
+  document.querySelector("button[type='submit']") ||
+  document.querySelector("[data-action='send']") ||
+  document.querySelector("button[class*='send']");
+
+const reportAction = (payload) =>
+  new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "ACTION_REPORT", payload }, () => resolve());
+  });
+
+const showAutoSendHint = (text) => {
+  const existing = document.getElementById("job-agent-auto-send-hint");
+  if (existing) {
+    existing.remove();
+  }
+  const hint = document.createElement("div");
+  hint.id = "job-agent-auto-send-hint";
+  hint.textContent = text;
+  hint.style.cssText = "position:fixed;bottom:16px;right:16px;z-index:99999;background:#111;color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;";
+  document.body.appendChild(hint);
+  setTimeout(() => hint.remove(), 3000);
+};
+
+const handleAutoSend = async (payload) => {
+  if (!performAutoSend || (await isAutomationPaused())) {
+    return;
+  }
+  const taskId = await getTaskId();
+  const result = await performAutoSend({
+    draftText: payload?.draft?.content || payload?.draft || "",
+    inputEl: findDraftInput(),
+    sendButtonEl: findSendButton(),
+    reportAction,
+    taskId,
+    afterSend: () => new Promise((resolve) => setTimeout(resolve, 300)),
+  });
+  if (result.status !== "ok") {
+    showAutoSendHint("自动发送失败，请手动确认");
   }
 };

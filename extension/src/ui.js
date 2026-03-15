@@ -41,10 +41,63 @@ export const buildOverlayHtml = ({ score, reasons, risks, draft }) => {
   `;
 };
 
+export const performAutoSend = async ({
+  draftText,
+  inputEl,
+  sendButtonEl,
+  reportAction,
+  taskId,
+  afterSend,
+}) => {
+  const report = typeof reportAction === "function" ? reportAction : async () => {};
+  if (!draftText || !inputEl || !sendButtonEl) {
+    await report({
+      task_id: taskId || "",
+      action_type: "FAILED",
+      status: "failed",
+      payload: { reason: "missing_input_or_button" },
+    });
+    return { status: "failed" };
+  }
+
+  if ("value" in inputEl) {
+    inputEl.value = draftText;
+  } else {
+    inputEl.textContent = draftText;
+  }
+  if (typeof inputEl.dispatchEvent === "function") {
+    inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  await report({
+    task_id: taskId || "",
+    action_type: "SEND",
+    status: "sent",
+    payload: { draft: draftText },
+  });
+
+  if (typeof sendButtonEl.click === "function") {
+    sendButtonEl.click();
+  }
+
+  if (typeof afterSend === "function") {
+    await afterSend();
+  }
+
+  await report({
+    task_id: taskId || "",
+    action_type: "DELIVERED",
+    status: "delivered",
+    payload: { draft: draftText },
+  });
+
+  return { status: "ok" };
+};
+
 if (typeof window !== "undefined") {
-  window.JobAgentUI = { buildOverlayHtml };
+  window.JobAgentUI = { buildOverlayHtml, performAutoSend };
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { buildOverlayHtml };
+  module.exports = { buildOverlayHtml, performAutoSend };
 }
