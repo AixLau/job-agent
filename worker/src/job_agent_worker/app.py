@@ -6,9 +6,20 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 
 from job_agent_worker.models import (
     DraftRequest,
+    FollowUpRequest,
     GoalParseRequest,
     JobMatchRequest,
+    ResumeParseRequest,
     ReplyClassifyRequest,
+)
+from job_agent_worker.follow_up import build_follow_up_plan
+from job_agent_worker.task_parser import parse_task_strategy
+from job_agent_worker.validators import (
+    validate_draft_payload,
+    validate_follow_up_payload,
+    validate_job_match_payload,
+    validate_reply_payload,
+    validate_task_strategy,
 )
 
 app = FastAPI()
@@ -36,16 +47,16 @@ goal_parse_cache: Dict[str, Dict[str, Any]] = {}
 job_match_cache: Dict[str, Dict[str, Any]] = {}
 draft_cache: Dict[str, Dict[str, Any]] = {}
 reply_cache: Dict[str, Dict[str, Any]] = {}
+follow_up_cache: Dict[str, Dict[str, Any]] = {}
+resume_parse_cache: Dict[str, Dict[str, Any]] = {}
 
 
 @app.post("/worker/goal-parse")
 def goal_parse(request: GoalParseRequest, _: str = Depends(require_worker_token)) -> Dict[str, Any]:
     def build() -> Dict[str, Any]:
-        text = request.strategy_text or ""
-        keywords = [token for token in re.split(r"\s+", text) if token]
-        if not keywords and text:
-            keywords = [text]
-        return {"strategy_json": {"keywords": keywords, "raw": text}}
+        strategy_json = parse_task_strategy(request.strategy_text or "")
+        validate_task_strategy(strategy_json)
+        return {"strategy_json": strategy_json}
 
     return cached_response(goal_parse_cache, request.idempotency_key, build)
 
@@ -73,8 +84,9 @@ def job_match(request: JobMatchRequest, _: str = Depends(require_worker_token)) 
             "risk_tags": risk_tags,
             "parsed_job": parsed_job,
         }
-
-    return cached_response(job_match_cache, request.idempotency_key, build)
+    response = cached_response(job_match_cache, request.idempotency_key, build)
+    validate_job_match_payload(response)
+    return response
 
 
 @app.post("/worker/draft")
@@ -89,8 +101,9 @@ def draft(request: DraftRequest, _: str = Depends(require_worker_token)) -> Dict
         if str(conversation.get("intent") or "").upper() == "INTERVIEW":
             payload["interview_draft"] = f"你好，我已收到{company}{title}岗位的面试邀约，可以配合确认时间。"
         return payload
-
-    return cached_response(draft_cache, request.idempotency_key, build)
+    response = cached_response(draft_cache, request.idempotency_key, build)
+    validate_draft_payload(response)
+    return response
 
 
 @app.post("/worker/reply-classify")
@@ -108,8 +121,42 @@ def reply_classify(
             summary = "需要跟进对话"
             next_action = "继续沟通"
         return {"intent": intent, "summary": summary, "next_action": next_action}
+    response = cached_response(reply_cache, request.idempotency_key, build)
+    validate_reply_payload(response)
+    return response
 
-    return cached_response(reply_cache, request.idempotency_key, build)
+
+@app.post("/worker/follow-up")
+def follow_up(
+    request: FollowUpRequest, _: str = Depends(require_worker_token)
+) -> Dict[str, Any]:
+    def build() -> Dict[str, Any]:
+        return build_follow_up_plan(request.messages, request.last_message_id)
+
+    response = cached_response(follow_up_cache, request.idempotency_key, build)
+    validate_follow_up_payload(response)
+    return response
+
+
+@app.post("/worker/resume-parse")
+def resume_parse(request: ResumeParseRequest, _: str = Depends(require_worker_token)) -> Dict[str, Any]:
+    def build() -> Dict[str, Any]:
+        parsed_json = {
+            "raw_text": request.content,
+            "format": request.format,
+        }
+        if request.file_name:
+            parsed_json["file_name"] = request.file_name
+        if request.source:
+            parsed_json["source"] = request.source
+        lines = request.content.splitlines()
+        if lines:
+            parsed_json["candidate_name"] = lines[0]
+        if len(lines) > 1:
+            parsed_json["headline"] = lines[1]
+        return {"parsed_json": parsed_json}
+
+    return cached_response(resume_parse_cache, request.idempotency_key, build)
 
 
 def extract_last_message_text(messages: List[Dict[str, Any]], last_message_id: str) -> str:

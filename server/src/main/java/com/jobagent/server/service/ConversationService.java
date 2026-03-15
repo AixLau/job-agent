@@ -13,9 +13,11 @@ import com.jobagent.server.dto.DraftApproveResponse;
 import com.jobagent.server.dto.DraftContent;
 import com.jobagent.server.dto.DraftRegenerateResponse;
 import com.jobagent.server.dto.DraftRejectResponse;
+import com.jobagent.server.dto.DraftItem;
 import com.jobagent.server.dto.DraftSummary;
 import com.jobagent.server.dto.ReplyItem;
 import com.jobagent.server.dto.ReplyResult;
+import com.jobagent.server.dto.WorkerFollowUpResponse;
 import com.jobagent.server.dto.WorkerReplyClassifyRequest;
 import com.jobagent.server.dto.WorkerReplyClassifyResponse;
 import com.jobagent.server.repository.ConversationRepository;
@@ -39,6 +41,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Service
 public class ConversationService {
@@ -49,6 +53,7 @@ public class ConversationService {
     private static final String STATUS_CLOSED = "CLOSED";
     private static final String STATUS_REPLIED = "REPLIED";
     private static final String STATUS_ARCHIVED = "ARCHIVED";
+    private static final String STATUS_WAITING_HR = "WAITING_HR";
     private static final String SOURCE_TYPE_SYSTEM = "SYSTEM";
 
     private final ConversationRepository conversationRepository;
@@ -58,6 +63,7 @@ public class ConversationService {
     private final MessageDraftRepository messageDraftRepository;
     private final TaskRepository taskRepository;
     private final WorkerClient workerClient;
+    private final FollowUpPolicyService followUpPolicyService;
     private final ModelOutputValidator validator;
     private final DuplicatePayloadBuilder duplicatePayloadBuilder;
     private final DashboardStore dashboardStore;
@@ -70,6 +76,7 @@ public class ConversationService {
                                MessageDraftRepository messageDraftRepository,
                                TaskRepository taskRepository,
                                WorkerClient workerClient,
+                               FollowUpPolicyService followUpPolicyService,
                                ModelOutputValidator validator,
                                DuplicatePayloadBuilder duplicatePayloadBuilder,
                                DashboardStore dashboardStore,
@@ -81,6 +88,7 @@ public class ConversationService {
         this.messageDraftRepository = messageDraftRepository;
         this.taskRepository = taskRepository;
         this.workerClient = workerClient;
+        this.followUpPolicyService = followUpPolicyService;
         this.validator = validator;
         this.duplicatePayloadBuilder = duplicatePayloadBuilder;
         this.dashboardStore = dashboardStore;
@@ -116,7 +124,16 @@ public class ConversationService {
 
         persistMessages(conversation.getId(), request.messages());
 
-        WorkerReplyClassifyResponse response = callReplyClassify(request, conversation);
+        CompletableFuture<WorkerReplyClassifyResponse> replyFuture = CompletableFuture.supplyAsync(() -> callReplyClassify(request, conversation));
+        CompletableFuture<WorkerFollowUpResponse> followUpFuture = CompletableFuture.supplyAsync(() -> callFollowUp(request, conversation));
+
+        WorkerReplyClassifyResponse response = join(replyFuture);
+        WorkerFollowUpResponse followUp = join(followUpFuture);
+        if (followUp == null) {
+            followUp = fallbackFollowUp(response);
+        }
+        validator.validateReplyClassify(response);
+        validator.validateFollowUp(followUp);
         try {
             validator.validateSummary(response.summary());
         } catch (ValidationException ex) {
@@ -125,25 +142,45 @@ public class ConversationService {
 
         conversation.setLastIntent(response.intent());
         conversation.setLastSummary(response.summary());
-        conversation.setLastAction(response.nextAction());
+        conversation.setLastAction(firstNonBlank(followUp.nextAction(), response.nextAction()));
+        conversation.setPriority(followUp.priority());
+        conversation.setFollowUpAt(resolveFollowUpAt(followUp.followUpHours()));
 
-        applyStatus(conversation, response.intent());
+        applyStatus(conversation, response.intent(), followUp.suggestedStatus());
         conversationRepository.save(conversation);
 
         ReplyResult reply = new ReplyResult(response.intent(), response.summary(), response.nextAction());
         dashboardStore.addReply(userId, new ReplyItem(
             conversation.getId(),
+            conversation.getJobPostId(),
+            resolveCompany(conversation.getJobPostId()),
             reply.summary(),
             reply.intent(),
+            conversation.getLastAction(),
+            conversation.getPriority(),
+            conversation.getFollowUpAt(),
             Instant.now()
         ));
 
-        MessageDraftEntity draftEntity = messageDraftRepository.findByConversationIdAndSourceType(
-            conversation.getId(),
-            SOURCE_TYPE_SYSTEM
-        ).orElse(null);
+        MessageDraftEntity draftEntity = upsertSystemDraft(conversation.getId(), firstNonBlank(
+            followUp.draftContent(),
+            existingDraftContent(conversation.getId())
+        ));
         DraftContent draftContent = draftEntity == null ? null : new DraftContent(defaultString(draftEntity.getContent(), ""));
-        boolean autoSend = draftContent != null && isAutoSendAllowed(task, conversation);
+        if (draftEntity != null) {
+            dashboardStore.addDraft(userId, new DraftItem(
+                draftEntity.getId(),
+                draftEntity.getConversationId(),
+                conversation.getJobPostId(),
+                resolveCompany(conversation.getJobPostId()),
+                draftEntity.getContent(),
+                draftEntity.getCreatedAt(),
+                draftEntity.isApproved()
+            ));
+        }
+        boolean autoSend = draftContent != null
+            && !Boolean.TRUE.equals(followUp.requiresReview())
+            && isAutoSendAllowed(task, conversation);
         ActionHint actionHint = draftContent == null ? null : new ActionHint(draftContent.content());
         return new ChatReportResponse("ok", reply, autoSend, draftContent, actionHint);
     }
@@ -286,10 +323,24 @@ public class ConversationService {
         }
     }
 
-    private void applyStatus(ConversationEntity conversation, String intent) {
+    private WorkerFollowUpResponse callFollowUp(ChatReportRequest request, ConversationEntity conversation) {
+        return followUpPolicyService.plan(
+            request.taskId(),
+            Map.of("id", conversation.getId(), "external_id", conversation.getExternalId()),
+            request.messages(),
+            request.lastMessageId(),
+            IdempotencyKeys.followUp(request.taskId(), request.conversationId(), request.lastMessageId())
+        );
+    }
+
+    private void applyStatus(ConversationEntity conversation, String intent, String suggestedStatus) {
         String status;
-        if ("INTERVIEW".equalsIgnoreCase(intent)) {
+        if ("INTERVIEW".equalsIgnoreCase(suggestedStatus) || "INTERVIEW".equalsIgnoreCase(intent)) {
             status = STATUS_INTERVIEW;
+        } else if ("WAITING_HR".equalsIgnoreCase(suggestedStatus)) {
+            status = STATUS_WAITING_HR;
+        } else if ("NEEDS_REPLY".equalsIgnoreCase(suggestedStatus)) {
+            status = STATUS_NEEDS_REPLY;
         } else if ("REJECTED".equalsIgnoreCase(intent)) {
             status = STATUS_CLOSED;
         } else {
@@ -302,6 +353,8 @@ public class ConversationService {
             if (post != null) {
                 if (STATUS_INTERVIEW.equals(status)) {
                     post.setStatus(STATUS_INTERVIEW);
+                } else if (STATUS_WAITING_HR.equals(status)) {
+                    post.setStatus(STATUS_WAITING_HR);
                 } else if (STATUS_CLOSED.equals(status)) {
                     post.setStatus(STATUS_ARCHIVED);
                 } else {
@@ -343,6 +396,84 @@ public class ConversationService {
             return objectMapper.readValue(match.getRiskTagsJson(), new TypeReference<>() {});
         } catch (Exception ex) {
             return List.of();
+        }
+    }
+
+    private MessageDraftEntity upsertSystemDraft(String conversationId, String content) {
+        MessageDraftEntity existing = messageDraftRepository.findByConversationIdAndSourceType(conversationId, SOURCE_TYPE_SYSTEM)
+            .orElse(null);
+        if (content == null || content.isBlank()) {
+            return existing;
+        }
+        if (existing != null && content.equals(existing.getContent())) {
+            return existing;
+        }
+        try {
+            validator.validateDraft(content);
+        } catch (ValidationException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
+        }
+        MessageDraftEntity draft = existing == null
+            ? new MessageDraftEntity(
+                UUID.randomUUID().toString(),
+                conversationId,
+                content,
+                SOURCE_TYPE_SYSTEM,
+                false,
+                null
+            )
+            : existing;
+        draft.setContent(content);
+        messageDraftRepository.save(draft);
+        return draft;
+    }
+
+    private String existingDraftContent(String conversationId) {
+        return messageDraftRepository.findByConversationIdAndSourceType(conversationId, SOURCE_TYPE_SYSTEM)
+            .map(MessageDraftEntity::getContent)
+            .orElse(null);
+    }
+
+    private WorkerFollowUpResponse fallbackFollowUp(WorkerReplyClassifyResponse response) {
+        String intent = response.intent() == null ? "" : response.intent();
+        String suggestedStatus = "INTERVIEW".equalsIgnoreCase(intent) ? STATUS_INTERVIEW : STATUS_NEEDS_REPLY;
+        Integer followUpHours = "INTERVIEW".equalsIgnoreCase(intent) ? 0 : 4;
+        return new WorkerFollowUpResponse(
+            "NORMAL",
+            suggestedStatus,
+            response.nextAction(),
+            followUpHours,
+            null,
+            false
+        );
+    }
+
+    private String resolveCompany(String jobPostId) {
+        if (jobPostId == null || jobPostId.isBlank()) {
+            return null;
+        }
+        return jobPostRepository.findById(jobPostId)
+            .map(JobPostEntity::getCompany)
+            .orElse(null);
+    }
+
+    private Instant resolveFollowUpAt(Integer followUpHours) {
+        int hours = followUpHours == null ? 0 : Math.max(followUpHours, 0);
+        return Instant.now().plusSeconds(hours * 3600L);
+    }
+
+    private <T> T join(CompletableFuture<T> future) {
+        try {
+            return future.join();
+        } catch (CompletionException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof ResponseStatusException responseStatusException) {
+                throw responseStatusException;
+            }
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw ex;
         }
     }
 

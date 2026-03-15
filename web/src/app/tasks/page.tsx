@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createTask, fetchTasks } from "../../lib/tasks";
+import {
+  createTask,
+  deriveTaskFormFromStrategy,
+  fetchTasks,
+  parseStrategyText,
+} from "../../lib/tasks";
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
@@ -12,6 +17,8 @@ export default function TasksPage() {
   const [experience, setExperience] = useState("");
   const [automationLevel, setAutomationLevel] = useState("SEMI");
   const [strategyText, setStrategyText] = useState("");
+  const [exclude, setExclude] = useState("");
+  const [preferences, setPreferences] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("access_token") || "";
@@ -35,10 +42,10 @@ export default function TasksPage() {
         city,
         salary,
         experience,
-        automation_level: automationLevel,
-        strategy_text: strategyText,
-        exclude: [],
-        preferences: [],
+        automationLevel,
+        strategyText,
+        exclude,
+        preferences,
       });
       const refreshed = await fetchTasks(undefined, token);
       setTasks(refreshed);
@@ -46,6 +53,18 @@ export default function TasksPage() {
     } catch (error) {
       setStatus("Create failed");
     }
+  };
+
+  const onApplyStrategy = () => {
+    const next = deriveTaskFormFromStrategy(parseStrategyText(strategyText));
+    setTitle((current) => current || next.title);
+    setCity((current) => current || next.city);
+    setSalary((current) => current || next.salary);
+    setExperience((current) => current || next.experience);
+    setAutomationLevel((current) => current === "SEMI" ? next.automationLevel : current);
+    setExclude((current) => current || next.exclude);
+    setPreferences((current) => current || next.preferences);
+    setStatus("Structured fields applied");
   };
 
   return (
@@ -73,9 +92,26 @@ export default function TasksPage() {
           </label>
           <label className="field">
             <span>Automation Level</span>
+            <select value={automationLevel} onChange={(e) => setAutomationLevel(e.target.value)}>
+              <option value="MANUAL">保守模式</option>
+              <option value="SEMI">半自动</option>
+              <option value="AUTO">自动模式</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Exclude</span>
             <input
-              value={automationLevel}
-              onChange={(e) => setAutomationLevel(e.target.value)}
+              value={exclude}
+              onChange={(e) => setExclude(e.target.value)}
+              placeholder="例如：外包, 派遣"
+            />
+          </label>
+          <label className="field">
+            <span>Preferences</span>
+            <input
+              value={preferences}
+              onChange={(e) => setPreferences(e.target.value)}
+              placeholder="例如：B端, 增长"
             />
           </label>
           <label className="field">
@@ -84,8 +120,12 @@ export default function TasksPage() {
               rows={4}
               value={strategyText}
               onChange={(e) => setStrategyText(e.target.value)}
+              placeholder="例如：上海 产品经理 20k-30k 3-5年 排除外包 偏好B端 AUTO"
             />
           </label>
+          <button type="button" onClick={onApplyStrategy}>
+            Apply Strategy
+          </button>
           <button type="submit">Create</button>
           <p className="hint">{status}</p>
         </form>

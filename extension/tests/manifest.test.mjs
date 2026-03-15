@@ -21,6 +21,8 @@ test("manifest has required MV3 fields", async () => {
   assert.ok(Array.isArray(manifest.permissions));
   assert.ok(manifest.permissions.includes("storage"));
   assert.ok(manifest.permissions.includes("activeTab"));
+  assert.ok(manifest.permissions.includes("alarms"));
+  assert.ok(manifest.permissions.includes("sidePanel"));
 
   assert.ok(Array.isArray(manifest.host_permissions));
   assert.ok(manifest.host_permissions.includes("https://*.zhipin.com/*"));
@@ -31,10 +33,14 @@ test("manifest has required MV3 fields", async () => {
     default_popup: "src/popup.html",
   });
 
+  assert.deepEqual(manifest.side_panel, {
+    default_path: "src/sidepanel.html",
+  });
+
   assert.ok(Array.isArray(manifest.content_scripts));
   assert.ok(manifest.content_scripts.length > 0);
 
   const contentScript = manifest.content_scripts[0];
   assert.ok(contentScript.matches.includes("https://*.zhipin.com/*"));
-  assert.deepEqual(contentScript.js, ["src/content.js"]);
+  assert.deepEqual(contentScript.js, ["src/extractor.js", "src/ui.js", "src/content.js"]);
 });

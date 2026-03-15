@@ -82,6 +82,14 @@ const sendReport = async () => {
   }
   const taskId = await getTaskId();
   const pageType = detectPageType(location.href);
+  chrome.runtime.sendMessage({
+    type: "PANEL_STATE_UPDATE",
+    payload: {
+      taskId,
+      pageType,
+      status: "SCANNING",
+    },
+  });
   if (pageType === "chat") {
     chrome.runtime.sendMessage(buildChatReport(taskId));
     return;
@@ -132,6 +140,17 @@ const renderOverlay = (payload) => {
   overlay.addEventListener("click", (event) => {
     const action = event.target?.dataset?.action;
     if (action === "ignore") {
+      chrome.runtime.sendMessage({
+        type: "PANEL_STATE_UPDATE",
+        payload: {
+          draft: "",
+          nextAction: "用户忽略当前建议",
+        },
+      });
+      overlay.remove();
+      return;
+    }
+    if (action === "close") {
       overlay.remove();
       return;
     }
@@ -139,7 +158,35 @@ const renderOverlay = (payload) => {
       const draftText =
         overlay.querySelector("#job-agent-draft")?.value || "";
       fillDraftIntoPage(draftText);
+      chrome.runtime.sendMessage({
+        type: "PANEL_STATE_UPDATE",
+        payload: {
+          draft: draftText,
+          nextAction: "草稿已填充到输入框",
+        },
+      });
       overlay.remove();
+      return;
+    }
+    if (action === "pause") {
+      chrome.runtime.sendMessage({ type: "SET_AUTOMATION_PAUSED", value: true });
+      getTaskId().then((taskId) =>
+        reportAction({
+          task_id: taskId,
+          action_type: "PAUSE",
+          status: "paused",
+          payload: { source: "overlay" },
+        })
+      );
+      overlay.remove();
+      return;
+    }
+    if (action === "send") {
+      const draftText =
+        overlay.querySelector("#job-agent-draft")?.value || "";
+      handleManualSend(draftText, overlay).catch(() => {
+        showAutoSendHint("发送失败，请手动处理");
+      });
     }
   });
 };
@@ -194,11 +241,37 @@ const handleAutoSend = async (payload) => {
     draftText: payload?.draft?.content || payload?.draft || "",
     inputEl: findDraftInput(),
     sendButtonEl: findSendButton(),
+    requiresReview: Boolean(payload?.requiresReview || payload?.requires_review),
     reportAction,
     taskId,
     afterSend: () => new Promise((resolve) => setTimeout(resolve, 300)),
   });
   if (result.status !== "ok") {
     showAutoSendHint("自动发送失败，请手动确认");
+  }
+};
+
+const handleManualSend = async (draftText, overlay) => {
+  if (!performAutoSend) {
+    return;
+  }
+  const taskId = await getTaskId();
+  const result = await performAutoSend({
+    draftText,
+    inputEl: findDraftInput(),
+    sendButtonEl: findSendButton(),
+    reportAction,
+    taskId,
+    afterSend: () => new Promise((resolve) => setTimeout(resolve, 300)),
+  });
+  if (result.status === "ok" && overlay) {
+    chrome.runtime.sendMessage({
+      type: "PANEL_STATE_UPDATE",
+      payload: {
+        draft: draftText,
+        nextAction: "草稿已发送",
+      },
+    });
+    overlay.remove();
   }
 };

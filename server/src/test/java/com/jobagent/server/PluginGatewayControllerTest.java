@@ -2,9 +2,11 @@ package com.jobagent.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.WorkerDraftResponse;
+import com.jobagent.server.dto.WorkerFollowUpResponse;
 import com.jobagent.server.dto.WorkerJobMatchResponse;
 import com.jobagent.server.dto.WorkerReplyClassifyResponse;
 import com.jobagent.server.repository.ConversationRepository;
+import com.jobagent.server.repository.DashboardRecommendationRepository;
 import com.jobagent.server.repository.JobMatchRepository;
 import com.jobagent.server.repository.JobPostRepository;
 import com.jobagent.server.repository.MessageDraftRepository;
@@ -66,6 +68,9 @@ class PluginGatewayControllerTest {
 
     @Autowired
     private ConversationRepository conversationRepository;
+
+    @Autowired
+    private DashboardRecommendationRepository dashboardRecommendationRepository;
 
     @Autowired
     private MessageRepository messageRepository;
@@ -215,6 +220,98 @@ class PluginGatewayControllerTest {
     }
 
     @Test
+    void page_report_skips_recommendation_and_draft_when_hard_filter_fails() throws Exception {
+        resetData();
+        seedTokenAndTask();
+        taskRepository.save(new TaskEntity(
+            "task-1",
+            "user-1",
+            "Role",
+            "Shanghai",
+            "20k-30k",
+            "3-5年",
+            "AUTO",
+            "ACTIVE",
+            "{\"goal\":\"x\"}",
+            "{\"city\":\"上海\",\"salary\":\"20k-30k\",\"experience\":\"3-5年\",\"exclude\":[\"外包\"],\"preferences\":[\"B端\"],\"automationLevel\":\"AUTO\"}",
+            "[]",
+            "[\"B端\"]",
+            Instant.now()
+        ));
+
+        when(workerClient.jobMatch(any()))
+            .thenReturn(new WorkerJobMatchResponse(
+                80,
+                List.of("r1"),
+                List.of(),
+                Map.of("salary_min", 10000, "salary_max", 15000, "exp_min", 1, "exp_max", 2)
+            ));
+        when(workerClient.buildDraft(any()))
+            .thenReturn(new WorkerDraftResponse("draft text"));
+
+        String body = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "page_type", "detail",
+            "raw_text", "北京 C端 外包",
+            "extracted_json", Map.of(
+                "source", "boss",
+                "external_id", "ext-filtered",
+                "title", "Role A",
+                "company", "Company A",
+                "city", "北京",
+                "salary", "10k-15k",
+                "experience", "1-2年"
+            ),
+            "source_url", "https://example.com/job/2",
+            "dom_hash", "hash2",
+            "want_draft", true
+        ));
+
+        mockMvc.perform(post("/plugin/page/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ok"))
+            .andExpect(jsonPath("$.analysis.score").value(80))
+            .andExpect(jsonPath("$.draft").doesNotExist());
+
+        org.assertj.core.api.Assertions.assertThat(dashboardRecommendationRepository.count()).isEqualTo(0);
+        org.assertj.core.api.Assertions.assertThat(messageDraftRepository.count()).isEqualTo(0);
+    }
+
+    @Test
+    void page_report_rejects_invalid_job_match_output() throws Exception {
+        resetData();
+        seedTokenAndTask();
+
+        when(workerClient.jobMatch(any()))
+            .thenReturn(new WorkerJobMatchResponse(101, List.of(), List.of(), null));
+
+        String body = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "page_type", "list",
+            "raw_text", "raw",
+            "extracted_json", Map.of(
+                "source", "boss",
+                "external_id", "ext-invalid-match",
+                "title", "Role A",
+                "company", "Company A"
+            ),
+            "source_url", "https://example.com/job/invalid",
+            "dom_hash", "hash-invalid",
+            "want_draft", false
+        ));
+
+        mockMvc.perform(post("/plugin/page/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     void chat_and_action_report_ok() throws Exception {
         resetData();
         seedTokenAndTask();
@@ -264,6 +361,42 @@ class PluginGatewayControllerTest {
                 .content(actionBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ok"));
+    }
+
+    @Test
+    void chat_report_rejects_invalid_reply_output() throws Exception {
+        resetData();
+        seedTokenAndTask();
+
+        ConversationEntity conversation = new ConversationEntity(
+            UUID.randomUUID().toString(),
+            "task-1",
+            null,
+            "conv-invalid",
+            "NEW",
+            null,
+            null,
+            null,
+            null
+        );
+        conversationRepository.save(conversation);
+
+        when(workerClient.replyClassify(any()))
+            .thenReturn(new WorkerReplyClassifyResponse("UNKNOWN", "summary", ""));
+
+        String chatBody = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "conversation_id", "conv-invalid",
+            "messages", List.of(Map.of("id", "m1", "role", "hr", "text", "hello")),
+            "last_message_id", "m1"
+        ));
+
+        mockMvc.perform(post("/plugin/chat/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(chatBody))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -447,6 +580,90 @@ class PluginGatewayControllerTest {
     }
 
     @Test
+    void chat_report_builds_interview_draft_and_follow_up_metadata() throws Exception {
+        resetData();
+        seedTokenAndTask("AUTO");
+
+        JobPostEntity jobPost = new JobPostEntity(
+            "job-3",
+            "task-1",
+            "boss",
+            "ext-3",
+            "Role C",
+            "Company C",
+            "Shanghai",
+            "30k-40k",
+            "5y",
+            "raw",
+            "{}",
+            "REPLIED",
+            Instant.now()
+        );
+        jobPostRepository.save(jobPost);
+        jobMatchRepository.save(new JobMatchEntity(
+            "match-3",
+            "task-1",
+            "job-3",
+            92,
+            "[\"fit\"]",
+            "[]",
+            "{\"automation_action\":\"AUTO_SEND\"}",
+            Instant.now()
+        ));
+
+        ConversationEntity conversation = new ConversationEntity(
+            UUID.randomUUID().toString(),
+            "task-1",
+            "job-3",
+            "conv-interview",
+            "WAITING_HR",
+            null,
+            null,
+            null,
+            Instant.now()
+        );
+        conversationRepository.save(conversation);
+
+        when(workerClient.replyClassify(any()))
+            .thenReturn(new WorkerReplyClassifyResponse("INTERVIEW", "HR 发来面试邀约", "确认面试时间"));
+        when(workerClient.followUp(any()))
+            .thenReturn(new WorkerFollowUpResponse(
+                "HIGH",
+                "INTERVIEW",
+                "确认面试时间",
+                0,
+                "你好，我已收到面试邀约，今天下午可以参加。",
+                false
+            ));
+
+        String chatBody = mapper.writeValueAsString(Map.of(
+            "task_id", "task-1",
+            "conversation_id", "conv-interview",
+            "messages", List.of(Map.of("id", "m1", "role", "hr", "text", "方便今天下午面试吗")),
+            "last_message_id", "m1"
+        ));
+
+        mockMvc.perform(post("/plugin/chat/report")
+                .header("X-Plugin-Token", "token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(chatBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.reply.intent").value("INTERVIEW"))
+            .andExpect(jsonPath("$.draft.content").value("你好，我已收到面试邀约，今天下午可以参加。"))
+            .andExpect(jsonPath("$.action_hint.fill_content").value("你好，我已收到面试邀约，今天下午可以参加。"));
+
+        ConversationEntity updated = conversationRepository.findById(conversation.getId()).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(updated.getStatus()).isEqualTo("INTERVIEW");
+        org.assertj.core.api.Assertions.assertThat(updated.getLastAction()).isEqualTo("确认面试时间");
+        org.assertj.core.api.Assertions.assertThat(updated.getPriority()).isEqualTo("HIGH");
+        org.assertj.core.api.Assertions.assertThat(updated.getFollowUpAt()).isNotNull();
+
+        MessageDraftEntity draft = messageDraftRepository.findByConversationIdAndSourceType(conversation.getId(), "SYSTEM")
+            .orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(draft.getContent()).contains("面试邀约");
+    }
+
+    @Test
     void chat_and_action_report_task_not_owned_returns_bad_request() throws Exception {
         resetData();
         seedTokenOnly();
@@ -501,6 +718,7 @@ class PluginGatewayControllerTest {
         messageRepository.deleteAll();
         conversationRepository.deleteAll();
         jobMatchRepository.deleteAll();
+        dashboardRecommendationRepository.deleteAll();
         jobPostRepository.deleteAll();
         resumeRepository.deleteAll();
         taskRepository.deleteAll();

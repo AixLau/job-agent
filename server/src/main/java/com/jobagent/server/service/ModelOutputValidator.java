@@ -1,8 +1,12 @@
 package com.jobagent.server.service;
 
+import com.jobagent.server.dto.WorkerJobMatchResponse;
+import com.jobagent.server.dto.WorkerFollowUpResponse;
+import com.jobagent.server.dto.WorkerReplyClassifyResponse;
 import jakarta.validation.ValidationException;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -13,6 +17,10 @@ public class ModelOutputValidator {
     private static final int DRAFT_MIN = 10;
     private static final int DRAFT_MAX = 500;
     private static final int SUMMARY_MAX = 200;
+    private static final int NEXT_ACTION_MAX = 100;
+    private static final List<String> ALLOWED_INTENTS = List.of("INTERVIEW", "FOLLOW_UP", "REJECTED");
+    private static final List<String> ALLOWED_PRIORITIES = List.of("HIGH", "NORMAL", "LOW");
+    private static final List<String> ALLOWED_STATUSES = List.of("INTERVIEW", "WAITING_HR", "NEEDS_REPLY", "CLOSED");
 
     private static final Pattern EMAIL_PATTERN =
         Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
@@ -57,6 +65,73 @@ public class ModelOutputValidator {
         validateCommon(value);
     }
 
+    public void validateReplyClassify(WorkerReplyClassifyResponse response) {
+        if (response == null) {
+            throw new ValidationException("reply payload missing");
+        }
+        String intent = response.intent() == null ? "" : response.intent().trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_INTENTS.contains(intent)) {
+            throw new ValidationException("invalid intent");
+        }
+        validateSummary(response.summary());
+        String nextAction = response.nextAction() == null ? "" : response.nextAction().trim();
+        if (nextAction.isBlank() || nextAction.length() > NEXT_ACTION_MAX) {
+            throw new ValidationException("invalid next action");
+        }
+        validateCommon(nextAction);
+    }
+
+    public void validateJobMatch(WorkerJobMatchResponse response) {
+        if (response == null) {
+            throw new ValidationException("job match missing");
+        }
+        Integer score = response.score();
+        if (score == null || score < 0 || score > 100) {
+            throw new ValidationException("invalid score");
+        }
+        if (response.reasons() == null || response.reasons().isEmpty()) {
+            throw new ValidationException("reasons required");
+        }
+        for (String reason : response.reasons()) {
+            String value = reason == null ? "" : reason.trim();
+            if (value.isBlank() || value.length() > SUMMARY_MAX) {
+                throw new ValidationException("invalid reason");
+            }
+            validateCommon(value);
+        }
+        validateStringList(response.risks());
+        validateParsedJob(response.parsedJob());
+    }
+
+    public void validateFollowUp(WorkerFollowUpResponse response) {
+        if (response == null) {
+            throw new ValidationException("follow up payload missing");
+        }
+        String priority = response.priority() == null ? "" : response.priority().trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_PRIORITIES.contains(priority)) {
+            throw new ValidationException("invalid priority");
+        }
+        String suggestedStatus = response.suggestedStatus() == null
+            ? ""
+            : response.suggestedStatus().trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_STATUSES.contains(suggestedStatus)) {
+            throw new ValidationException("invalid suggested status");
+        }
+        String nextAction = response.nextAction() == null ? "" : response.nextAction().trim();
+        if (nextAction.isBlank() || nextAction.length() > NEXT_ACTION_MAX) {
+            throw new ValidationException("invalid next action");
+        }
+        validateCommon(nextAction);
+        String draftContent = response.draftContent();
+        if (draftContent != null && !draftContent.isBlank()) {
+            validateDraft(draftContent);
+        }
+        Integer followUpHours = response.followUpHours();
+        if (followUpHours == null || followUpHours < 0 || followUpHours > 168) {
+            throw new ValidationException("invalid follow up hours");
+        }
+    }
+
     private void validateCommon(String value) {
         if (containsContact(value)) {
             throw new ValidationException("contact info not allowed");
@@ -87,5 +162,53 @@ public class ModelOutputValidator {
             }
         }
         return false;
+    }
+
+    private void validateStringList(List<String> values) {
+        if (values == null) {
+            return;
+        }
+        for (String value : values) {
+            String normalized = value == null ? "" : value.trim();
+            if (normalized.isBlank() || normalized.length() > 40) {
+                throw new ValidationException("invalid list item");
+            }
+        }
+    }
+
+    private void validateParsedJob(Map<String, Object> parsedJob) {
+        if (parsedJob == null) {
+            return;
+        }
+        validateRange(parsedJob, "salary_min", "salary_max");
+        validateRange(parsedJob, "exp_min", "exp_max");
+    }
+
+    private void validateRange(Map<String, Object> parsedJob, String minKey, String maxKey) {
+        Integer min = readInt(parsedJob.get(minKey));
+        Integer max = readInt(parsedJob.get(maxKey));
+        if (min != null && min < 0) {
+            throw new ValidationException("invalid range");
+        }
+        if (max != null && max < 0) {
+            throw new ValidationException("invalid range");
+        }
+        if (min != null && max != null && min > max) {
+            throw new ValidationException("invalid range order");
+        }
+    }
+
+    private Integer readInt(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            throw new ValidationException("invalid numeric value");
+        }
     }
 }

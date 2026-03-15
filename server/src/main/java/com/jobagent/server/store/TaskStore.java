@@ -39,25 +39,36 @@ public class TaskStore {
     public TaskResponse create(TaskCreateRequest request, String userId) {
         String id = UUID.randomUUID().toString();
         String strategyJson = strategyService.parse(request.strategyText(), id);
+        RuleConfigParser.RuleConfig config = ruleConfigParser.parse(strategyJson);
+        String resolvedTitle = firstNonBlank(request.title(), config.title());
+        String resolvedCity = firstNonBlank(request.city(), config.city());
+        String resolvedSalary = firstNonBlank(request.salary(), config.salary());
+        String resolvedExperience = firstNonBlank(request.experience(), config.experience());
+        String resolvedAutomationLevel = firstNonBlank(request.automationLevel(), config.automationLevel());
+        List<String> resolvedExclude = firstNonEmptyList(request.exclude(), config.exclude());
+        List<String> resolvedPreferences = firstNonEmptyList(request.preferences(), config.preferences());
         String ruleConfigJson = buildRuleConfigJson(
-            strategyJson,
-            request.salary(),
-            request.experience(),
-            request.automationLevel()
+            resolvedTitle,
+            resolvedCity,
+            resolvedSalary,
+            resolvedExperience,
+            resolvedAutomationLevel,
+            resolvedExclude,
+            resolvedPreferences
         );
         TaskEntity entity = new TaskEntity(
             id,
             userId,
-            request.title(),
-            request.city(),
-            request.salary(),
-            request.experience(),
-            request.automationLevel(),
+            resolvedTitle,
+            resolvedCity,
+            resolvedSalary,
+            resolvedExperience,
+            resolvedAutomationLevel,
             "ACTIVE",
             strategyJson,
             ruleConfigJson,
-            toJson(request.exclude()),
-            toJson(request.preferences()),
+            toJson(resolvedExclude),
+            toJson(resolvedPreferences),
             Instant.now()
         );
         TaskEntity saved = repository.save(entity);
@@ -86,29 +97,46 @@ public class TaskStore {
             }
             entity.setStatus(normalizedStatus);
         }
-        if (request.automationLevel() != null) {
-            entity.setAutomationLevel(request.automationLevel());
-        }
-        if (request.exclude() != null) {
-            entity.setExcludeJson(toJson(request.exclude()));
-        }
-        if (request.preferences() != null) {
-            entity.setPreferencesJson(toJson(request.preferences()));
-        }
         if (request.strategyText() != null) {
             entity.setStrategyJson(strategyService.parse(request.strategyText(), entity.getId()));
         }
-        if (request.salary() != null
-            || request.experience() != null
-            || request.automationLevel() != null
-            || request.strategyText() != null) {
-            entity.setRuleConfigJson(buildRuleConfigJson(
-                entity.getStrategyJson(),
-                entity.getSalary(),
-                entity.getExperience(),
-                entity.getAutomationLevel()
-            ));
+        RuleConfigParser.RuleConfig config = ruleConfigParser.parse(entity.getStrategyJson());
+        if (request.title() == null && entity.getTitle() == null && config.title() != null) {
+            entity.setTitle(config.title());
         }
+        if (request.city() == null && entity.getCity() == null && config.city() != null) {
+            entity.setCity(config.city());
+        }
+        if (request.salary() == null && entity.getSalary() == null && config.salary() != null) {
+            entity.setSalary(config.salary());
+        }
+        if (request.experience() == null && entity.getExperience() == null && config.experience() != null) {
+            entity.setExperience(config.experience());
+        }
+        if (request.automationLevel() != null) {
+            entity.setAutomationLevel(request.automationLevel());
+        } else if (entity.getAutomationLevel() == null && config.automationLevel() != null) {
+            entity.setAutomationLevel(config.automationLevel());
+        }
+        if (request.exclude() != null) {
+            entity.setExcludeJson(toJson(request.exclude()));
+        } else if (isBlankJsonArray(entity.getExcludeJson()) && !config.exclude().isEmpty()) {
+            entity.setExcludeJson(toJson(config.exclude()));
+        }
+        if (request.preferences() != null) {
+            entity.setPreferencesJson(toJson(request.preferences()));
+        } else if (isBlankJsonArray(entity.getPreferencesJson()) && !config.preferences().isEmpty()) {
+            entity.setPreferencesJson(toJson(config.preferences()));
+        }
+        entity.setRuleConfigJson(buildRuleConfigJson(
+            entity.getTitle(),
+            entity.getCity(),
+            entity.getSalary(),
+            entity.getExperience(),
+            entity.getAutomationLevel(),
+            parseJsonList(entity.getExcludeJson()),
+            parseJsonList(entity.getPreferencesJson())
+        ));
         TaskEntity saved = repository.save(entity);
         return toResponse(saved);
     }
@@ -145,30 +173,41 @@ public class TaskStore {
         }
     }
 
-    private String buildRuleConfigJson(String strategyJson,
+    private String buildRuleConfigJson(String title,
+                                       String city,
                                        String salary,
                                        String experience,
-                                       String automationLevel) {
-        RuleConfigParser.RuleConfig parsed = ruleConfigParser.parse(strategyJson);
-        String resolvedSalary = firstNonBlank(parsed.salary(), salary);
-        String resolvedExperience = firstNonBlank(parsed.experience(), experience);
-        String resolvedAutomation = firstNonBlank(parsed.automationLevel(), automationLevel);
+                                       String automationLevel,
+                                       List<String> exclude,
+                                       List<String> preferences) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        if (resolvedSalary != null) {
-            payload.put("salary", resolvedSalary);
+        if (title != null) {
+            payload.put("title", title);
         }
-        if (resolvedExperience != null) {
-            payload.put("experience", resolvedExperience);
+        if (city != null) {
+            payload.put("city", city);
         }
-        if (resolvedAutomation != null) {
-            payload.put("automationLevel", resolvedAutomation);
+        if (salary != null) {
+            payload.put("salary", salary);
+        }
+        if (experience != null) {
+            payload.put("experience", experience);
+        }
+        if (automationLevel != null) {
+            payload.put("automationLevel", automationLevel);
+        }
+        if (!exclude.isEmpty()) {
+            payload.put("exclude", exclude);
+        }
+        if (!preferences.isEmpty()) {
+            payload.put("preferences", preferences);
         }
         try {
-        return mapper.writeValueAsString(payload);
-    } catch (Exception ex) {
-        return "{}";
+            return mapper.writeValueAsString(payload);
+        } catch (Exception ex) {
+            return "{}";
+        }
     }
-}
 
     private boolean isAllowedStatus(String status) {
         return "PAUSED".equals(status)
@@ -184,5 +223,30 @@ public class TaskStore {
             return fallback;
         }
         return null;
+    }
+
+    private List<String> firstNonEmptyList(List<String> primary, List<String> fallback) {
+        if (primary != null && !primary.isEmpty()) {
+            return primary;
+        }
+        if (fallback != null && !fallback.isEmpty()) {
+            return fallback;
+        }
+        return List.of();
+    }
+
+    private boolean isBlankJsonArray(String json) {
+        return json == null || json.isBlank() || "[]".equals(json.trim());
+    }
+
+    private List<String> parseJsonList(String json) {
+        if (isBlankJsonArray(json)) {
+            return List.of();
+        }
+        try {
+            return mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, String.class));
+        } catch (Exception ex) {
+            return List.of();
+        }
     }
 }

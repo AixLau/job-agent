@@ -27,6 +27,10 @@ public final class IdempotencyKeys {
         return taskId + ":REPLY_CLASSIFY:" + safe(conversationId) + ":" + safe(lastMessageId);
     }
 
+    public static String followUp(String taskId, String conversationId, String lastMessageId) {
+        return taskId + ":FOLLOW_UP:" + safe(conversationId) + ":" + safe(lastMessageId);
+    }
+
     private static String normalize(String value) {
         if (value == null) {
             return "";

@@ -9,6 +9,7 @@ import com.jobagent.server.repository.DashboardRecommendationRepository;
 import com.jobagent.server.repository.DashboardReplyRepository;
 import com.jobagent.server.repository.ConversationRepository;
 import com.jobagent.server.repository.JobPostRepository;
+import com.jobagent.server.repository.MessageDraftRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -45,9 +46,12 @@ class DashboardStoreTest {
     @Autowired
     private JobPostRepository jobPostRepository;
 
+    @Autowired
+    private MessageDraftRepository messageDraftRepository;
+
     @Test
     void snapshotReturnsLatestAndMetrics() {
-        store.addRecommendation("user-1", new RecommendationItem("job-1", "A", "C1", 80, List.of("r1"), "ACTIVE"));
+        store.addRecommendation("user-1", new RecommendationItem("job-1", "A", "C1", 80, List.of("理由1"), List.of("r1"), "ACTIVE"));
         store.addDraft("user-1", new DraftItem("draft-1", "conv-1", "d1", Instant.now(), false));
         store.addReply("user-1", new ReplyItem("conv-1", "s1", "INTERVIEW", Instant.now()));
 
@@ -65,6 +69,7 @@ class DashboardStoreTest {
             "A",
             "C1",
             80,
+            "[\"理由1\"]",
             "[\"r1\"]",
             "ACTIVE",
             Instant.parse("2024-01-01T00:00:00Z")
@@ -76,6 +81,7 @@ class DashboardStoreTest {
             "B",
             "C1",
             81,
+            "[\"理由2\"]",
             "[\"r2\"]",
             "ACTIVE",
             Instant.parse("2024-01-02T00:00:00Z")
@@ -136,9 +142,31 @@ class DashboardStoreTest {
             "NEW",
             null,
             null,
-            null,
+            "确认面试时间",
             Instant.parse("2024-01-02T00:00:00Z")
         ));
+        ConversationEntity conversation = conversationRepository.findById("conv-2").orElseThrow();
+        conversation.setPriority("HIGH");
+        conversation.setFollowUpAt(Instant.parse("2024-01-02T01:00:00Z"));
+        conversationRepository.save(conversation);
+        draftRepository.save(new DashboardDraftEntity(
+            "draft-chat-2",
+            "user-1",
+            "conv-2",
+            "可以参加面试，感谢安排。",
+            false,
+            Instant.parse("2024-01-02T00:00:00Z")
+        ));
+        // chat draft store drives interview detail rendering
+        com.jobagent.server.store.MessageDraftEntity messageDraftEntity = new com.jobagent.server.store.MessageDraftEntity(
+            "draft-chat-2",
+            "conv-2",
+            "可以参加面试，感谢安排。",
+            "SYSTEM",
+            false,
+            Instant.parse("2024-01-02T00:00:00Z")
+        );
+        messageDraftRepository.save(messageDraftEntity);
 
         var snapshot = store.snapshot("user-1");
 
@@ -147,14 +175,18 @@ class DashboardStoreTest {
         assertThat(snapshot.metrics().replies()).isEqualTo(1);
         assertThat(snapshot.metrics().interviews()).isEqualTo(1);
         assertThat(snapshot.recommendations().get(0).title()).isEqualTo("B");
+        assertThat(snapshot.recommendations().get(0).reasons()).containsExactly("理由2");
         assertThat(snapshot.drafts().get(0).conversationId()).isEqualTo("conv-2");
         assertThat(snapshot.drafts().get(0).jobPostId()).isEqualTo("job-2");
         assertThat(snapshot.drafts().get(0).company()).isEqualTo("Company B");
         assertThat(snapshot.replies().get(0).summary()).isEqualTo("s2");
         assertThat(snapshot.replies().get(0).jobPostId()).isEqualTo("job-2");
         assertThat(snapshot.replies().get(0).company()).isEqualTo("Company B");
+        assertThat(snapshot.replies().get(0).nextAction()).isEqualTo("确认面试时间");
+        assertThat(snapshot.replies().get(0).priority()).isEqualTo("HIGH");
         assertThat(snapshot.interviews().get(0).company()).isEqualTo("Company B");
         assertThat(snapshot.interviews().get(0).title()).isEqualTo("Title B");
+        assertThat(snapshot.interviews().get(0).draftContent()).isEqualTo("可以参加面试，感谢安排。");
     }
 
     @org.springframework.boot.test.context.TestConfiguration
@@ -165,6 +197,7 @@ class DashboardStoreTest {
                                       DashboardReplyRepository replyRepository,
                                       ConversationRepository conversationRepository,
                                       JobPostRepository jobPostRepository,
+                                      MessageDraftRepository messageDraftRepository,
                                       ObjectMapper objectMapper,
                                       Environment environment) {
             int maxItems = Integer.parseInt(environment.getProperty("job-agent.dashboard.max-items", "20"));
@@ -174,6 +207,7 @@ class DashboardStoreTest {
                 replyRepository,
                 conversationRepository,
                 jobPostRepository,
+                messageDraftRepository,
                 objectMapper,
                 maxItems
             );

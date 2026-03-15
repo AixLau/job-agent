@@ -35,6 +35,7 @@ class DashboardRepositoryTest {
             "智聘科技",
             88,
             "[\"岗位匹配\"]",
+            "[\"岗位匹配\"]",
             "ACTIVE"
         );
         DashboardDraftEntity draft = new DashboardDraftEntity(
@@ -77,6 +78,7 @@ class DashboardRepositoryTest {
             "产品经理",
             "智聘科技",
             80,
+            "[\"理由1\"]",
             "[\"r1\"]",
             "ACTIVE",
             timestamp
@@ -88,6 +90,7 @@ class DashboardRepositoryTest {
             "高级产品经理",
             "智聘科技",
             90,
+            "[\"理由2\"]",
             "[\"r2\"]",
             "ACTIVE",
             timestamp

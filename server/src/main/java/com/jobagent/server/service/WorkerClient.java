@@ -4,6 +4,8 @@ import com.jobagent.server.dto.GoalParseRequest;
 import com.jobagent.server.dto.GoalParseResponse;
 import com.jobagent.server.dto.WorkerDraftRequest;
 import com.jobagent.server.dto.WorkerDraftResponse;
+import com.jobagent.server.dto.WorkerFollowUpRequest;
+import com.jobagent.server.dto.WorkerFollowUpResponse;
 import com.jobagent.server.dto.WorkerJobMatchRequest;
 import com.jobagent.server.dto.WorkerJobMatchResponse;
 import com.jobagent.server.dto.WorkerReplyClassifyRequest;
@@ -54,6 +56,10 @@ public class WorkerClient {
 
     public WorkerReplyClassifyResponse replyClassify(WorkerReplyClassifyRequest request) {
         return post("/worker/reply-classify", request, WorkerReplyClassifyResponse.class);
+    }
+
+    public WorkerFollowUpResponse followUp(WorkerFollowUpRequest request) {
+        return post("/worker/follow-up", request, WorkerFollowUpResponse.class);
     }
 
     private <T> T post(String path, Object request, Class<T> responseType) {

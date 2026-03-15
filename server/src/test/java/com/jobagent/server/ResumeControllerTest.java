@@ -145,6 +145,64 @@ class ResumeControllerTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void parse_resume_returns_preview_for_file_upload() throws Exception {
+        auditLogRepository.deleteAll();
+        resumeRepository.deleteAll();
+        userRepository.deleteAll();
+
+        String token = registerAndLogin("alice");
+
+        String body = """
+            {
+              "content": "Alice Zhang\\nProduct Manager\\n5 years",
+              "format": "PDF",
+              "source": "upload",
+              "file_name": "resume.pdf"
+            }
+            """;
+
+        mockMvc.perform(post("/api/resume/parse")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.parsed_json.file_name").value("resume.pdf"))
+            .andExpect(jsonPath("$.parsed_json.format").value("PDF"))
+            .andExpect(jsonPath("$.parsed_json.raw_text").value("Alice Zhang\nProduct Manager\n5 years"));
+    }
+
+    @Test
+    void confirm_resume_persists_parsed_result() throws Exception {
+        auditLogRepository.deleteAll();
+        resumeRepository.deleteAll();
+        userRepository.deleteAll();
+
+        String token = registerAndLogin("alice");
+
+        String body = """
+            {
+              "content": "Alice Zhang\\nProduct Manager\\n5 years",
+              "format": "PDF",
+              "source": "upload",
+              "parsed_json": {
+                "file_name": "resume.pdf",
+                "format": "PDF",
+                "raw_text": "Alice Zhang\\nProduct Manager\\n5 years"
+              }
+            }
+            """;
+
+        mockMvc.perform(post("/api/resume/confirm")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resume.id").exists())
+            .andExpect(jsonPath("$.resume.parsed_json.file_name").value("resume.pdf"))
+            .andExpect(jsonPath("$.resume.parsed_json.format").value("PDF"));
+    }
+
     private String registerAndLogin(String account) throws Exception {
         String registerBody = mapper.writeValueAsString(Map.of(
             "account", account,

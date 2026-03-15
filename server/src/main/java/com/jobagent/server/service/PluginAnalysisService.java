@@ -113,6 +113,7 @@ public class PluginAnalysisService {
             title,
             company,
             analysis.score(),
+            analysis.reasons(),
             analysis.riskTags(),
             ""
         );

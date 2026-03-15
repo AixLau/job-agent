@@ -14,6 +14,7 @@ import com.jobagent.server.repository.DashboardRecommendationRepository;
 import com.jobagent.server.repository.DashboardReplyRepository;
 import com.jobagent.server.repository.ConversationRepository;
 import com.jobagent.server.repository.JobPostRepository;
+import com.jobagent.server.repository.MessageDraftRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class DashboardStore {
     private final DashboardReplyRepository replyRepository;
     private final ConversationRepository conversationRepository;
     private final JobPostRepository jobPostRepository;
+    private final MessageDraftRepository messageDraftRepository;
     private final ObjectMapper objectMapper;
     private final int maxItems;
 
@@ -42,6 +44,7 @@ public class DashboardStore {
                           DashboardReplyRepository replyRepository,
                           ConversationRepository conversationRepository,
                           JobPostRepository jobPostRepository,
+                          MessageDraftRepository messageDraftRepository,
                           ObjectMapper objectMapper,
                           @Value("${job-agent.dashboard.max-items:20}") int maxItems) {
         this.recommendationRepository = recommendationRepository;
@@ -49,11 +52,13 @@ public class DashboardStore {
         this.replyRepository = replyRepository;
         this.conversationRepository = conversationRepository;
         this.jobPostRepository = jobPostRepository;
+        this.messageDraftRepository = messageDraftRepository;
         this.objectMapper = objectMapper;
         this.maxItems = maxItems;
     }
 
     public void addRecommendation(String userId, RecommendationItem item) {
+        String reasonsJson = writeList(item.reasons());
         String risksJson = writeRisks(item.risks());
         DashboardRecommendationEntity entity = new DashboardRecommendationEntity(
             UUID.randomUUID().toString(),
@@ -62,6 +67,7 @@ public class DashboardStore {
             item.title(),
             item.company(),
             item.score(),
+            reasonsJson,
             risksJson,
             item.status()
         );
@@ -129,6 +135,7 @@ public class DashboardStore {
             List<RecommendationItem> recList = recommendationRepository
                 .findAllByUserIdOrderByCreatedAtDescIdDesc(userId, page)
                 .stream()
+                .filter(this::isVisibleRecommendation)
                 .map(this::toRecommendation)
                 .toList();
             List<DraftItem> draftList = draftRepository
@@ -144,19 +151,7 @@ public class DashboardStore {
 
             List<InterviewItem> interviews = replyList.stream()
                 .filter(item -> "INTERVIEW".equalsIgnoreCase(item.intent()))
-                .map(item -> {
-                    String company = "";
-                    String title = "";
-                    var conversation = conversationRepository.findById(item.conversationId()).orElse(null);
-                    if (conversation != null && conversation.getJobPostId() != null) {
-                        var post = jobPostRepository.findById(conversation.getJobPostId()).orElse(null);
-                        if (post != null) {
-                            company = post.getCompany() == null ? "" : post.getCompany();
-                            title = post.getTitle() == null ? "" : post.getTitle();
-                        }
-                    }
-                    return new InterviewItem(item.conversationId(), company, title, item.updatedAt());
-                })
+                .map(this::toInterview)
                 .toList();
 
             DashboardMetrics metrics = new DashboardMetrics(
@@ -185,6 +180,7 @@ public class DashboardStore {
             entity.getTitle(),
             entity.getCompany(),
             entity.getScore(),
+            readList(entity.getReasonsJson()),
             readRisks(entity.getRisksJson()),
             entity.getStatus()
         );
@@ -215,6 +211,9 @@ public class DashboardStore {
     private ReplyItem toReply(DashboardReplyEntity entity) {
         String jobPostId = null;
         String company = null;
+        String nextAction = null;
+        String priority = null;
+        java.time.Instant followUpAt = null;
         var conversation = conversationRepository.findById(entity.getConversationId()).orElse(null);
         if (conversation != null && conversation.getJobPostId() != null) {
             jobPostId = conversation.getJobPostId();
@@ -222,6 +221,9 @@ public class DashboardStore {
             if (post != null) {
                 company = post.getCompany();
             }
+            nextAction = conversation.getLastAction();
+            priority = conversation.getPriority();
+            followUpAt = conversation.getFollowUpAt();
         }
         return new ReplyItem(
             entity.getConversationId(),
@@ -229,25 +231,82 @@ public class DashboardStore {
             company,
             entity.getSummary(),
             entity.getIntent(),
+            nextAction,
+            priority,
+            followUpAt,
             entity.getUpdatedAt()
         );
     }
 
+    private InterviewItem toInterview(ReplyItem item) {
+        String company = item.company() == null ? "" : item.company();
+        String title = "";
+        String draftId = null;
+        String draftContent = null;
+        var conversation = conversationRepository.findById(item.conversationId()).orElse(null);
+        if (conversation != null && conversation.getJobPostId() != null) {
+            var post = jobPostRepository.findById(conversation.getJobPostId()).orElse(null);
+            if (post != null) {
+                title = post.getTitle() == null ? "" : post.getTitle();
+            }
+            var draft = messageDraftRepository.findByConversationIdAndSourceType(conversation.getId(), "SYSTEM").orElse(null);
+            if (draft != null) {
+                draftId = draft.getId();
+                draftContent = draft.getContent();
+            } else {
+                var dashboardDraft = draftRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId());
+                if (dashboardDraft != null) {
+                    draftId = dashboardDraft.getId();
+                    draftContent = dashboardDraft.getContent();
+                }
+            }
+        }
+        return new InterviewItem(
+            item.conversationId(),
+            company,
+            title,
+            draftId,
+            draftContent,
+            item.nextAction(),
+            item.updatedAt()
+        );
+    }
+
+    public List<RecommendationItem> recommendations(String userId) {
+        return snapshot(userId).recommendations();
+    }
+
+    public List<ReplyItem> replies(String userId) {
+        return snapshot(userId).replies();
+    }
+
+    public List<InterviewItem> interviews(String userId) {
+        return snapshot(userId).interviews();
+    }
+
     private String writeRisks(List<String> risks) {
-        List<String> safeRisks = risks == null ? EMPTY_REASONS : risks;
+        return writeList(risks);
+    }
+
+    private String writeList(List<String> values) {
+        List<String> safeValues = values == null ? EMPTY_REASONS : values;
         try {
-            return objectMapper.writeValueAsString(safeRisks);
+            return objectMapper.writeValueAsString(safeValues);
         } catch (JsonProcessingException ex) {
             return "[]";
         }
     }
 
     private List<String> readRisks(String risksJson) {
-        if (risksJson == null || risksJson.isBlank()) {
+        return readList(risksJson);
+    }
+
+    private List<String> readList(String json) {
+        if (json == null || json.isBlank()) {
             return EMPTY_REASONS;
         }
         try {
-            return objectMapper.readValue(risksJson, new TypeReference<>() {});
+            return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (JsonProcessingException ex) {
             return EMPTY_REASONS;
         }
@@ -256,5 +315,13 @@ public class DashboardStore {
     private DashboardResponse emptyResponse() {
         DashboardMetrics metrics = new DashboardMetrics(0, 0, 0, 0);
         return new DashboardResponse(metrics, List.of(), List.of(), List.of(), List.of(), java.time.Instant.now());
+    }
+
+    private boolean isVisibleRecommendation(DashboardRecommendationEntity entity) {
+        if (entity == null || entity.getJobPostId() == null) {
+            return false;
+        }
+        JobPostEntity post = jobPostRepository.findById(entity.getJobPostId()).orElse(null);
+        return post != null && !"ARCHIVED".equalsIgnoreCase(post.getStatus());
     }
 }

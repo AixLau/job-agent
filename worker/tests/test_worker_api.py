@@ -50,6 +50,27 @@ class WorkerApiTest(unittest.TestCase):
         self.assertEqual(payload["strategy_json"]["raw"], "focus 产品")
         self.assertIn("focus", payload["strategy_json"]["keywords"])
 
+    def test_goal_parse_returns_structured_task_fields(self):
+        response = self.client.post(
+            "/worker/goal-parse",
+            headers=self.headers,
+            json={
+                "task_id": "t-structured",
+                "stage": "GOAL_PARSE",
+                "strategy_text": "上海 产品经理 20k-30k 3-5年 排除外包 偏好B端 AUTO",
+                "idempotency_key": "goal-structured"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["strategy_json"]["title"], "产品经理")
+        self.assertEqual(payload["strategy_json"]["city"], "上海")
+        self.assertEqual(payload["strategy_json"]["salary"], "20k-30k")
+        self.assertEqual(payload["strategy_json"]["experience"], "3-5年")
+        self.assertEqual(payload["strategy_json"]["automationLevel"], "AUTO")
+        self.assertIn("外包", payload["strategy_json"]["exclude"])
+        self.assertIn("B端", payload["strategy_json"]["preferences"])
+
     def test_job_match(self):
         response = self.client.post(
             "/worker/job-match",
@@ -179,6 +200,63 @@ class WorkerApiTest(unittest.TestCase):
         self.assertEqual(payload["intent"], "INTERVIEW")
         self.assertTrue(payload["summary"])
         self.assertTrue(payload["next_action"])
+
+    def test_follow_up_returns_interview_plan(self):
+        response = self.client.post(
+            "/worker/follow-up",
+            headers=self.headers,
+            json={
+                "task_id": "t1",
+                "stage": "FOLLOW_UP",
+                "conversation": {"id": "c1"},
+                "messages": [{"id": "m1", "role": "hr", "text": "方便安排面试吗"}],
+                "last_message_id": "m1",
+                "idempotency_key": "k-follow-up-1"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["priority"], "HIGH")
+        self.assertEqual(payload["suggested_status"], "INTERVIEW")
+        self.assertEqual(payload["follow_up_hours"], 0)
+        self.assertIn("面试", payload["draft_content"])
+
+    def test_follow_up_returns_waiting_hr_plan(self):
+        response = self.client.post(
+            "/worker/follow-up",
+            headers=self.headers,
+            json={
+                "task_id": "t1",
+                "stage": "FOLLOW_UP",
+                "conversation": {"id": "c1"},
+                "messages": [{"id": "m2", "role": "hr", "text": "收到，后续有进展再同步你。"}],
+                "last_message_id": "m2",
+                "idempotency_key": "k-follow-up-2"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["priority"], "NORMAL")
+        self.assertEqual(payload["suggested_status"], "WAITING_HR")
+        self.assertEqual(payload["follow_up_hours"], 24)
+
+    def test_resume_parse_returns_preview_fields(self):
+        response = self.client.post(
+            "/worker/resume-parse",
+            headers=self.headers,
+            json={
+                "content": "Alice Zhang\nProduct Manager\n5 years",
+                "format": "PDF",
+                "file_name": "resume.pdf",
+                "source": "upload",
+                "idempotency_key": "resume-1"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["parsed_json"]["file_name"], "resume.pdf")
+        self.assertEqual(payload["parsed_json"]["format"], "PDF")
+        self.assertEqual(payload["parsed_json"]["raw_text"], "Alice Zhang\nProduct Manager\n5 years")
 
 
 if __name__ == "__main__":

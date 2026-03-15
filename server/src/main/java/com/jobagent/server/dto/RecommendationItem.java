@@ -7,6 +7,7 @@ public record RecommendationItem(
     String title,
     String company,
     int score,
+    List<String> reasons,
     List<String> risks,
     String status
 ) {}
