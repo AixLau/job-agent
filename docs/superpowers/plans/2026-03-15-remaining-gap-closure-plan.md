@@ -153,14 +153,14 @@
 - Test: `server/src/test/java/com/jobagent/server/ProfileControllerTest.java`
 - Test: `web/tests/profile.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖资料获取、更新、鉴权与字段校验
-- [ ] Step 2: 运行后端测试，确认失败
-- [ ] Step 3: 实现 `ProfileEntity/ProfileService/ProfileController`
-- [ ] Step 4: 运行后端测试，确认通过
-- [ ] Step 5: 写 Web 失败测试，覆盖页面加载、提交与错误提示
-- [ ] Step 6: 实现 `profile` 页面与 `web/src/lib/profile.js`
-- [ ] Step 7: 运行 Web 测试，确认通过
-- [ ] Step 8: 提交
+- [x] Step 1: 写失败测试，覆盖资料获取、更新、鉴权与字段校验
+- [x] Step 2: 运行后端测试，确认失败
+- [x] Step 3: 实现 `ProfileEntity/ProfileService/ProfileController`
+- [x] Step 4: 运行后端测试，确认通过
+- [x] Step 5: 写 Web 失败测试，覆盖页面加载、提交与错误提示
+- [x] Step 6: 实现 `profile` 页面与 `web/src/lib/profile.js`
+- [x] Step 7: 运行 Web 测试，确认通过
+- [x] Step 8: 提交
 
 ### Task 2: Add file-based resume upload and parse confirmation
 

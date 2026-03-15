@@ -64,8 +64,16 @@ public class UserEntity {
         return email;
     }
 
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
     public String getProfileStatus() {
         return profileStatus;
+    }
+
+    public void setProfileStatus(String profileStatus) {
+        this.profileStatus = profileStatus;
     }
 
     public Instant getCreatedAt() {
