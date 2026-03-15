@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 
@@ -64,8 +64,15 @@ def job_match(request: JobMatchRequest, _: str = Depends(require_worker_token)) 
         else:
             score = 60
             reasons = ["匹配度一般"]
-        risks: List[str] = []
-        return {"score": score, "reasons": reasons, "risks": risks}
+        risk_tags = detect_risk_tags(jd_raw)
+        parsed_job = build_parsed_job(job_post)
+        return {
+            "score": score,
+            "reasons": reasons,
+            "risks": risk_tags,
+            "risk_tags": risk_tags,
+            "parsed_job": parsed_job,
+        }
 
     return cached_response(job_match_cache, request.idempotency_key, build)
 
@@ -74,10 +81,14 @@ def job_match(request: JobMatchRequest, _: str = Depends(require_worker_token)) 
 def draft(request: DraftRequest, _: str = Depends(require_worker_token)) -> Dict[str, Any]:
     def build() -> Dict[str, Any]:
         job_post = request.job_post or {}
+        conversation = request.conversation or {}
         company = job_post.get("company") or "贵司"
         title = job_post.get("title") or "岗位"
         content = f"你好，我对{company}的{title}岗位很感兴趣，期待沟通。"
-        return {"content": content}
+        payload = {"content": content}
+        if str(conversation.get("intent") or "").upper() == "INTERVIEW":
+            payload["interview_draft"] = f"你好，我已收到{company}{title}岗位的面试邀约，可以配合确认时间。"
+        return payload
 
     return cached_response(draft_cache, request.idempotency_key, build)
 
@@ -116,3 +127,44 @@ def extract_last_message_text(messages: List[Dict[str, Any]], last_message_id: s
         if target.get("text") is not None
         else str(target.get("content") or target.get("message") or "")
     )
+
+
+def detect_risk_tags(text: str) -> List[str]:
+    tags: List[str] = []
+    for keyword in ("外包", "大小周", "派遣", "996"):
+        if keyword in text:
+            tags.append(keyword)
+    return tags
+
+
+def build_parsed_job(job_post: Dict[str, Any]) -> Dict[str, Any]:
+    salary_text = str(job_post.get("salary") or "")
+    experience_text = str(job_post.get("experience") or "")
+    salary_min, salary_max = parse_salary_range(salary_text)
+    exp_min, exp_max = parse_experience_range(experience_text)
+    return {
+        "salary_min": salary_min,
+        "salary_max": salary_max,
+        "exp_min": exp_min,
+        "exp_max": exp_max,
+    }
+
+
+def parse_salary_range(text: str) -> Tuple[Optional[int], Optional[int]]:
+    match = re.search(r"(\d+)\s*-\s*(\d+)\s*[kK]", text)
+    if match:
+        return int(match.group(1)) * 1000, int(match.group(2)) * 1000
+    plus_match = re.search(r"(\d+)\s*[kK]\+", text)
+    if plus_match:
+        return int(plus_match.group(1)) * 1000, None
+    return None, None
+
+
+def parse_experience_range(text: str) -> Tuple[Optional[int], Optional[int]]:
+    match = re.search(r"(\d+)\s*-\s*(\d+)\s*年", text)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    lower_match = re.search(r"(\d+)\s*年以上", text)
+    if lower_match:
+        return int(lower_match.group(1)), None
+    return None, None

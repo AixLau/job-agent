@@ -68,6 +68,50 @@ class WorkerApiTest(unittest.TestCase):
         self.assertEqual(payload["score"], 80)
         self.assertTrue(payload["reasons"])
 
+    def test_job_match_returns_parsed_job_and_risk_tags(self):
+        response = self.client.post(
+            "/worker/job-match",
+            headers=self.headers,
+            json={
+                "task_id": "t1",
+                "stage": "JOB_MATCH",
+                "job_post": {
+                    "jd_raw": "外包 大小周 产品岗位",
+                    "salary": "20-30k",
+                    "experience": "3-5年"
+                },
+                "resume": {"content": "产品经验"},
+                "strategy": {},
+                "idempotency_key": "k3b"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(
+            set(payload["parsed_job"].keys()),
+            {"salary_min", "salary_max", "exp_min", "exp_max"},
+        )
+        self.assertEqual(payload["parsed_job"]["salary_min"], 20000)
+        self.assertEqual(payload["parsed_job"]["salary_max"], 30000)
+        self.assertEqual(payload["parsed_job"]["exp_min"], 3)
+        self.assertEqual(payload["parsed_job"]["exp_max"], 5)
+        self.assertIn("外包", payload["risk_tags"])
+        self.assertIn("大小周", payload["risk_tags"])
+
+    def test_worker_requires_token_for_job_match(self):
+        response = self.client.post(
+            "/worker/job-match",
+            json={
+                "task_id": "t1",
+                "stage": "JOB_MATCH",
+                "job_post": {"raw_text": "这是产品岗位"},
+                "resume": {"content": "产品经验"},
+                "strategy": {},
+                "idempotency_key": "k3c"
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+
     def test_draft(self):
         response = self.client.post(
             "/worker/draft",
@@ -84,6 +128,38 @@ class WorkerApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["content"], "你好，我对公司A的产品经理岗位很感兴趣，期待沟通。")
+
+    def test_draft_returns_interview_draft_when_intent_interview(self):
+        response = self.client.post(
+            "/worker/draft",
+            headers=self.headers,
+            json={
+                "task_id": "t1",
+                "stage": "DRAFT",
+                "conversation": {"id": "c1", "intent": "INTERVIEW"},
+                "job_post": {"company": "公司A", "title": "产品经理"},
+                "resume": {"content": "经验"},
+                "idempotency_key": "k4b"
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("interview_draft", payload)
+        self.assertIn("公司A", payload["interview_draft"])
+
+    def test_worker_requires_token_for_draft(self):
+        response = self.client.post(
+            "/worker/draft",
+            json={
+                "task_id": "t1",
+                "stage": "DRAFT",
+                "conversation": {"id": "c1"},
+                "job_post": {"company": "公司A", "title": "产品经理"},
+                "resume": {"content": "经验"},
+                "idempotency_key": "k4c"
+            },
+        )
+        self.assertEqual(response.status_code, 401)
 
     def test_reply_classify(self):
         response = self.client.post(
