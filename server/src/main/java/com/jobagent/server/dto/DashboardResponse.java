@@ -6,5 +6,7 @@ public record DashboardResponse(
     DashboardMetrics metrics,
     List<RecommendationItem> recommendations,
     List<DraftItem> drafts,
-    List<ReplyItem> replies
+    List<ReplyItem> replies,
+    List<InterviewItem> interviews,
+    java.time.Instant updatedAt
 ) {}

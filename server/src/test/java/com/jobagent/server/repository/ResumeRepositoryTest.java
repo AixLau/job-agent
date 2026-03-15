@@ -17,6 +17,7 @@ class ResumeRepositoryTest {
     void saveAndLoadResume() {
         ResumeEntity entity = new ResumeEntity(
             "r-1",
+            "user-1",
             "张三\n产品经理",
             "{\"name\":\"张三\"}"
         );

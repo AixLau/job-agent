@@ -1,49 +1,25 @@
-const analyzeButton = document.getElementById("analyze");
 const statusEl = document.getElementById("status");
-const resultEl = document.getElementById("result");
-
-const API_BASE = "http://localhost:8080";
+const formEl = document.getElementById("login-form");
+const accountEl = document.getElementById("account");
+const passwordEl = document.getElementById("password");
 
 const setStatus = (text) => {
   statusEl.textContent = text;
 };
 
-const setResult = (text) => {
-  resultEl.textContent = text;
-};
-
-analyzeButton.addEventListener("click", async () => {
-  setStatus("Analyzing...");
-  setResult("");
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    setStatus("No active tab");
+formEl.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const account = accountEl.value.trim();
+  const password = passwordEl.value;
+  if (!account || !password) {
+    setStatus("Missing credentials");
     return;
   }
-
-  chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_PAGE" }, async (payload) => {
-    if (chrome.runtime.lastError) {
-      setStatus("No content script");
-      return;
-    }
-    try {
-      const response = await fetch(`${API_BASE}/plugin/page/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          task_id: "demo-task",
-          ...payload,
-        }),
-      });
-      if (!response.ok) {
-        setStatus("Server error");
-        return;
-      }
-      const data = await response.json();
-      setStatus("Done");
-      setResult(`Score: ${data.analysis?.score ?? "-"}`);
-    } catch (error) {
-      setStatus("Fetch failed");
-    }
-  });
+  setStatus("Logging in...");
+  try {
+    const token = await window.JobAgentApi.loginAndStoreToken(account, password);
+    setStatus(token ? "Logged in" : "Login failed");
+  } catch (error) {
+    setStatus("Login failed");
+  }
 });

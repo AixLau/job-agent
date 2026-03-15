@@ -6,11 +6,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.DashboardMetrics;
 import com.jobagent.server.dto.DashboardResponse;
 import com.jobagent.server.dto.DraftItem;
+import com.jobagent.server.dto.InterviewItem;
 import com.jobagent.server.dto.RecommendationItem;
 import com.jobagent.server.dto.ReplyItem;
 import com.jobagent.server.repository.DashboardDraftRepository;
 import com.jobagent.server.repository.DashboardRecommendationRepository;
 import com.jobagent.server.repository.DashboardReplyRepository;
+import com.jobagent.server.repository.ConversationRepository;
+import com.jobagent.server.repository.JobPostRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,29 +32,38 @@ public class DashboardStore {
     private final DashboardRecommendationRepository recommendationRepository;
     private final DashboardDraftRepository draftRepository;
     private final DashboardReplyRepository replyRepository;
+    private final ConversationRepository conversationRepository;
+    private final JobPostRepository jobPostRepository;
     private final ObjectMapper objectMapper;
     private final int maxItems;
 
     public DashboardStore(DashboardRecommendationRepository recommendationRepository,
                           DashboardDraftRepository draftRepository,
                           DashboardReplyRepository replyRepository,
+                          ConversationRepository conversationRepository,
+                          JobPostRepository jobPostRepository,
                           ObjectMapper objectMapper,
                           @Value("${job-agent.dashboard.max-items:20}") int maxItems) {
         this.recommendationRepository = recommendationRepository;
         this.draftRepository = draftRepository;
         this.replyRepository = replyRepository;
+        this.conversationRepository = conversationRepository;
+        this.jobPostRepository = jobPostRepository;
         this.objectMapper = objectMapper;
         this.maxItems = maxItems;
     }
 
-    public void addRecommendation(RecommendationItem item) {
-        String reasonsJson = writeReasons(item.reasons());
+    public void addRecommendation(String userId, RecommendationItem item) {
+        String risksJson = writeRisks(item.risks());
         DashboardRecommendationEntity entity = new DashboardRecommendationEntity(
             UUID.randomUUID().toString(),
+            userId,
+            item.jobPostId(),
             item.title(),
             item.company(),
             item.score(),
-            reasonsJson
+            risksJson,
+            item.status()
         );
         try {
             recommendationRepository.save(entity);
@@ -60,12 +72,17 @@ public class DashboardStore {
         }
     }
 
-    public void addDraft(DraftItem item) {
+    public void addDraft(String userId, DraftItem item) {
+        String draftId = item.draftId() == null || item.draftId().isBlank()
+            ? UUID.randomUUID().toString()
+            : item.draftId();
         DashboardDraftEntity entity = new DashboardDraftEntity(
-            UUID.randomUUID().toString(),
-            item.company(),
-            item.title(),
-            item.content()
+            draftId,
+            userId,
+            item.conversationId(),
+            item.content(),
+            item.approved(),
+            item.createdAt()
         );
         try {
             draftRepository.save(entity);
@@ -74,13 +91,30 @@ public class DashboardStore {
         }
     }
 
-    public void addReply(ReplyItem item) {
+    public void updateDraftApproval(String draftId, boolean approved) {
+        if (draftId == null || draftId.isBlank()) {
+            return;
+        }
+        DashboardDraftEntity entity = draftRepository.findById(draftId).orElse(null);
+        if (entity == null) {
+            return;
+        }
+        entity.setApproved(approved);
+        try {
+            draftRepository.save(entity);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to update draft approval", ex);
+        }
+    }
+
+    public void addReply(String userId, ReplyItem item) {
         DashboardReplyEntity entity = new DashboardReplyEntity(
             UUID.randomUUID().toString(),
-            item.company(),
-            item.intent(),
+            userId,
+            item.conversationId(),
             item.summary(),
-            item.nextAction()
+            item.intent(),
+            item.updatedAt()
         );
         try {
             replyRepository.save(entity);
@@ -89,37 +123,50 @@ public class DashboardStore {
         }
     }
 
-    public DashboardResponse snapshot() {
+    public DashboardResponse snapshot(String userId) {
         try {
             PageRequest page = PageRequest.of(0, maxItems);
             List<RecommendationItem> recList = recommendationRepository
-                .findAllByOrderByCreatedAtDescIdDesc(page)
+                .findAllByUserIdOrderByCreatedAtDescIdDesc(userId, page)
                 .stream()
                 .map(this::toRecommendation)
                 .toList();
             List<DraftItem> draftList = draftRepository
-                .findAllByOrderByCreatedAtDescIdDesc(page)
+                .findAllByUserIdOrderByCreatedAtDescIdDesc(userId, page)
                 .stream()
                 .map(this::toDraft)
                 .toList();
             List<ReplyItem> replyList = replyRepository
-                .findAllByOrderByCreatedAtDescIdDesc(page)
+                .findAllByUserIdOrderByUpdatedAtDescIdDesc(userId, page)
                 .stream()
                 .map(this::toReply)
                 .toList();
 
-            int interviews = (int) replyList.stream()
+            List<InterviewItem> interviews = replyList.stream()
                 .filter(item -> "INTERVIEW".equalsIgnoreCase(item.intent()))
-                .count();
+                .map(item -> {
+                    String company = "";
+                    String title = "";
+                    var conversation = conversationRepository.findById(item.conversationId()).orElse(null);
+                    if (conversation != null && conversation.getJobPostId() != null) {
+                        var post = jobPostRepository.findById(conversation.getJobPostId()).orElse(null);
+                        if (post != null) {
+                            company = post.getCompany() == null ? "" : post.getCompany();
+                            title = post.getTitle() == null ? "" : post.getTitle();
+                        }
+                    }
+                    return new InterviewItem(item.conversationId(), company, title, item.updatedAt());
+                })
+                .toList();
 
             DashboardMetrics metrics = new DashboardMetrics(
                 recList.size(),
                 draftList.size(),
                 replyList.size(),
-                interviews
+                interviews.size()
             );
 
-            return new DashboardResponse(metrics, recList, draftList, replyList);
+            return new DashboardResponse(metrics, recList, draftList, replyList, interviews, java.time.Instant.now());
         } catch (RuntimeException ex) {
             log.warn("Failed to load dashboard snapshot", ex);
             return emptyResponse();
@@ -134,45 +181,49 @@ public class DashboardStore {
 
     private RecommendationItem toRecommendation(DashboardRecommendationEntity entity) {
         return new RecommendationItem(
+            entity.getJobPostId(),
             entity.getTitle(),
             entity.getCompany(),
             entity.getScore(),
-            readReasons(entity.getReasonsJson())
+            readRisks(entity.getRisksJson()),
+            entity.getStatus()
         );
     }
 
     private DraftItem toDraft(DashboardDraftEntity entity) {
         return new DraftItem(
-            entity.getCompany(),
-            entity.getTitle(),
-            entity.getContent()
+            entity.getId(),
+            entity.getConversationId(),
+            entity.getContent(),
+            entity.getCreatedAt(),
+            entity.isApproved()
         );
     }
 
     private ReplyItem toReply(DashboardReplyEntity entity) {
         return new ReplyItem(
-            entity.getCompany(),
-            entity.getIntent(),
+            entity.getConversationId(),
             entity.getSummary(),
-            entity.getNextAction()
+            entity.getIntent(),
+            entity.getUpdatedAt()
         );
     }
 
-    private String writeReasons(List<String> reasons) {
-        List<String> safeReasons = reasons == null ? EMPTY_REASONS : reasons;
+    private String writeRisks(List<String> risks) {
+        List<String> safeRisks = risks == null ? EMPTY_REASONS : risks;
         try {
-            return objectMapper.writeValueAsString(safeReasons);
+            return objectMapper.writeValueAsString(safeRisks);
         } catch (JsonProcessingException ex) {
             return "[]";
         }
     }
 
-    private List<String> readReasons(String reasonsJson) {
-        if (reasonsJson == null || reasonsJson.isBlank()) {
+    private List<String> readRisks(String risksJson) {
+        if (risksJson == null || risksJson.isBlank()) {
             return EMPTY_REASONS;
         }
         try {
-            return objectMapper.readValue(reasonsJson, new TypeReference<>() {});
+            return objectMapper.readValue(risksJson, new TypeReference<>() {});
         } catch (JsonProcessingException ex) {
             return EMPTY_REASONS;
         }
@@ -180,6 +231,6 @@ public class DashboardStore {
 
     private DashboardResponse emptyResponse() {
         DashboardMetrics metrics = new DashboardMetrics(0, 0, 0, 0);
-        return new DashboardResponse(metrics, List.of(), List.of(), List.of());
+        return new DashboardResponse(metrics, List.of(), List.of(), List.of(), List.of(), java.time.Instant.now());
     }
 }

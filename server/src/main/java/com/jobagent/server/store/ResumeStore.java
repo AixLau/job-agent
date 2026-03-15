@@ -6,7 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.ResumeRequest;
 import com.jobagent.server.dto.ResumeResponse;
 import com.jobagent.server.repository.ResumeRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.UUID;
@@ -24,29 +26,27 @@ public class ResumeStore {
         this.objectMapper = objectMapper;
     }
 
-    public ResumeResponse save(ResumeRequest request) {
+    public ResumeResponse save(ResumeRequest request, String userId) {
         String id = UUID.randomUUID().toString();
-        Map<String, Object> parsed = request.parsedJson() == null
-            ? EMPTY_PARSED
-            : request.parsedJson();
+        Map<String, Object> parsed = Map.of("content", request.content());
         String parsedJson = writeParsedJson(parsed);
-        ResumeEntity entity = new ResumeEntity(id, request.content(), parsedJson);
+        ResumeEntity entity = new ResumeEntity(id, userId, request.content(), parsedJson);
         repository.save(entity);
-        return new ResumeResponse(id, request.content(), parsed);
+        return new ResumeResponse(new ResumeResponse.ResumePayload(id, parsed, entity.getCreatedAt()));
     }
 
-    public ResumeResponse latest() {
-        return repository.findFirstByOrderByCreatedAtDesc()
+    public ResumeResponse latest(String userId) {
+        return repository.findFirstByUserIdOrderByCreatedAtDesc(userId)
             .map(this::toResponse)
-            .orElseGet(() -> new ResumeResponse("", "", EMPTY_PARSED));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "resume not found"));
     }
 
     private ResumeResponse toResponse(ResumeEntity entity) {
-        return new ResumeResponse(
+        return new ResumeResponse(new ResumeResponse.ResumePayload(
             entity.getId(),
-            entity.getContent(),
-            readParsedJson(entity.getParsedJson())
-        );
+            readParsedJson(entity.getParsedJson()),
+            entity.getCreatedAt()
+        ));
     }
 
     private String writeParsedJson(Map<String, Object> parsed) {

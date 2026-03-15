@@ -1,6 +1,11 @@
 spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
+
+job-agent:
+  worker:
+    base-url: http://localhost:8081
+    token: local-dev-token
   datasource:
     url: ${JOB_AGENT_DB_URL:jdbc:h2:mem:jobagent;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}
     username: ${JOB_AGENT_DB_USER:sa}
@@ -10,7 +15,5 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
-
-job-agent:
   dashboard:
     max-items: 20

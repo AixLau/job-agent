@@ -29,23 +29,28 @@ class DashboardRepositoryTest {
     void saveAndLoadAllEntities() {
         DashboardRecommendationEntity rec = new DashboardRecommendationEntity(
             "rec-1",
+            "user-1",
+            "job-1",
             "资深产品经理",
             "智聘科技",
             88,
-            "[\"岗位匹配\"]"
+            "[\"岗位匹配\"]",
+            "ACTIVE"
         );
         DashboardDraftEntity draft = new DashboardDraftEntity(
             "draft-1",
-            "智聘科技",
-            "资深产品经理",
-            "您好，我对贵司岗位很感兴趣"
+            "user-1",
+            "conv-1",
+            "您好，我对贵司岗位很感兴趣",
+            false
         );
         DashboardReplyEntity reply = new DashboardReplyEntity(
             "reply-1",
-            "智聘科技",
-            "INTERVIEW",
+            "user-1",
+            "conv-1",
             "可以安排面试吗",
-            "确认面试时间"
+            "INTERVIEW",
+            Instant.now()
         );
 
         recommendationRepository.save(rec);
@@ -67,59 +72,67 @@ class DashboardRepositoryTest {
 
         recommendationRepository.save(new DashboardRecommendationEntity(
             "rec-1",
+            "user-1",
+            "job-1",
             "产品经理",
             "智聘科技",
             80,
             "[\"r1\"]",
+            "ACTIVE",
             timestamp
         ));
         recommendationRepository.save(new DashboardRecommendationEntity(
             "rec-2",
+            "user-1",
+            "job-2",
             "高级产品经理",
             "智聘科技",
             90,
             "[\"r2\"]",
+            "ACTIVE",
             timestamp
         ));
 
         draftRepository.save(new DashboardDraftEntity(
             "draft-1",
-            "智聘科技",
-            "产品经理",
+            "user-1",
+            "conv-1",
             "d1",
+            false,
             timestamp
         ));
         draftRepository.save(new DashboardDraftEntity(
             "draft-2",
-            "智聘科技",
-            "高级产品经理",
+            "user-1",
+            "conv-2",
             "d2",
+            false,
             timestamp
         ));
 
         replyRepository.save(new DashboardReplyEntity(
             "reply-1",
-            "智聘科技",
-            "INTERVIEW",
+            "user-1",
+            "conv-1",
             "s1",
-            "n1",
+            "INTERVIEW",
             timestamp
         ));
         replyRepository.save(new DashboardReplyEntity(
             "reply-2",
-            "智聘科技",
-            "INTERVIEW",
+            "user-1",
+            "conv-2",
             "s2",
-            "n2",
+            "INTERVIEW",
             timestamp
         ));
 
         List<DashboardRecommendationEntity> recs = recommendationRepository
-            .findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(0, 1));
+            .findAllByUserIdOrderByCreatedAtDescIdDesc("user-1", PageRequest.of(0, 1));
         List<DashboardDraftEntity> drafts = draftRepository
-            .findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(0, 1));
+            .findAllByUserIdOrderByCreatedAtDescIdDesc("user-1", PageRequest.of(0, 1));
         List<DashboardReplyEntity> replies = replyRepository
-            .findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(0, 1));
+            .findAllByUserIdOrderByUpdatedAtDescIdDesc("user-1", PageRequest.of(0, 1));
 
         assertThat(recs).hasSize(1);
         assertThat(drafts).hasSize(1);

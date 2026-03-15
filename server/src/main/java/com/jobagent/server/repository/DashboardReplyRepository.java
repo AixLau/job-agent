@@ -8,5 +8,5 @@ import java.util.List;
 
 public interface DashboardReplyRepository extends JpaRepository<DashboardReplyEntity, String> {
 
-    List<DashboardReplyEntity> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
+    List<DashboardReplyEntity> findAllByUserIdOrderByUpdatedAtDescIdDesc(String userId, Pageable pageable);
 }

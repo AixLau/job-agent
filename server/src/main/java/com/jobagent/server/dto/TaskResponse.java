@@ -1,11 +1,15 @@
 package com.jobagent.server.dto;
 
+import java.time.Instant;
+
 public record TaskResponse(
-    String taskId,
+    String id,
     String status,
-    String targetRole,
+    String title,
     String city,
     String salary,
     String experience,
-    String automationLevel
+    String automationLevel,
+    String strategyJson,
+    Instant createdAt
 ) {}

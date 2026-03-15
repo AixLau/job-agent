@@ -1,6 +1,6 @@
 .popup {
-  min-width: 220px;
-  padding: 12px;
+  min-width: 240px;
+  padding: 14px;
   font-family: Arial, sans-serif;
 }
 
@@ -10,19 +10,39 @@
   font-size: 12px;
 }
 
-button {
-  width: 100%;
-  padding: 8px 10px;
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #333;
+}
+
+input {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
 .status {
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 12px;
   color: #444;
 }
 
-.result {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #222;
+button {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: #1f6feb;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
 }

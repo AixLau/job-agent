@@ -10,10 +10,20 @@
     <main class="popup">
       <h1>Job Agent</h1>
       <p class="subtitle">Boss 直聘页面助手</p>
-      <button id="analyze">Analyze Page</button>
+      <form id="login-form" class="form">
+        <label class="field">
+          <span>Account</span>
+          <input id="account" type="text" required />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="password" type="password" required />
+        </label>
+        <button type="submit">Login</button>
+      </form>
       <div id="status" class="status">Idle</div>
-      <div id="result" class="result"></div>
     </main>
+    <script src="api.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

@@ -12,57 +12,57 @@ import java.time.Instant;
 @Entity
 @Table(
     name = "dashboard_replies",
-    indexes = @Index(name = "idx_dashboard_replies_created_at", columnList = "created_at")
+    indexes = @Index(name = "idx_dashboard_replies_updated_at", columnList = "updated_at")
 )
 public class DashboardReplyEntity {
 
     @Id
     private String id;
 
-    @Column(nullable = false)
-    private String company;
+    @Column(name = "user_id", nullable = false)
+    private String userId;
 
-    @Column(nullable = false)
-    private String intent;
+    @Column(name = "conversation_id", nullable = false)
+    private String conversationId;
 
     @Column(nullable = false, columnDefinition = "text")
     private String summary;
 
-    @Column(name = "next_action", nullable = false)
-    private String nextAction;
+    @Column(nullable = false)
+    private String intent;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     protected DashboardReplyEntity() {
     }
 
     public DashboardReplyEntity(String id,
-                                String company,
-                                String intent,
+                                String userId,
+                                String conversationId,
                                 String summary,
-                                String nextAction) {
-        this(id, company, intent, summary, nextAction, Instant.now());
+                                String intent) {
+        this(id, userId, conversationId, summary, intent, Instant.now());
     }
 
     public DashboardReplyEntity(String id,
-                                String company,
-                                String intent,
+                                String userId,
+                                String conversationId,
                                 String summary,
-                                String nextAction,
-                                Instant createdAt) {
+                                String intent,
+                                Instant updatedAt) {
         this.id = id;
-        this.company = company;
-        this.intent = intent;
+        this.userId = userId;
+        this.conversationId = conversationId;
         this.summary = summary;
-        this.nextAction = nextAction;
-        this.createdAt = createdAt;
+        this.intent = intent;
+        this.updatedAt = updatedAt;
     }
 
     @PrePersist
     void ensureCreatedAt() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
+        if (updatedAt == null) {
+            updatedAt = Instant.now();
         }
     }
 
@@ -70,23 +70,23 @@ public class DashboardReplyEntity {
         return id;
     }
 
-    public String getCompany() {
-        return company;
+    public String getUserId() {
+        return userId;
     }
 
-    public String getIntent() {
-        return intent;
+    public String getConversationId() {
+        return conversationId;
     }
 
     public String getSummary() {
         return summary;
     }
 
-    public String getNextAction() {
-        return nextAction;
+    public String getIntent() {
+        return intent;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

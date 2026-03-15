@@ -70,7 +70,13 @@ public class PluginAnalysisService {
             title
         );
 
-        return new DraftItem(company, title, content);
+        return new DraftItem(
+            java.util.UUID.randomUUID().toString(),
+            "",
+            content,
+            java.time.Instant.now(),
+            false
+        );
     }
 
     public ReplyResult analyzeChat(ChatReportRequest request) {
@@ -102,12 +108,23 @@ public class PluginAnalysisService {
             valueOf(data, "company_name"),
             "未知公司"
         );
-        return new RecommendationItem(title, company, analysis.score(), analysis.reasons());
+        return new RecommendationItem(
+            "",
+            title,
+            company,
+            analysis.score(),
+            analysis.riskTags(),
+            ""
+        );
     }
 
     public ReplyItem toReplyItem(ChatReportRequest request, ReplyResult replyResult) {
-        String company = "未知公司";
-        return new ReplyItem(company, replyResult.intent(), replyResult.summary(), replyResult.nextAction());
+        return new ReplyItem(
+            request.conversationId(),
+            replyResult.summary(),
+            replyResult.intent(),
+            java.time.Instant.now()
+        );
     }
 
     private String extractLastMessageText(ChatReportRequest request) {

@@ -1,9 +1,14 @@
 package com.jobagent.server.dto;
 
+import java.time.Instant;
 import java.util.Map;
 
 public record ResumeResponse(
-    String resumeId,
-    String content,
-    Map<String, Object> parsedJson
-) {}
+    ResumePayload resume
+) {
+    public record ResumePayload(
+        String id,
+        Map<String, Object> parsedJson,
+        Instant createdAt
+    ) {}
+}

@@ -19,6 +19,12 @@ public class DashboardRecommendationEntity {
     @Id
     private String id;
 
+    @Column(name = "user_id", nullable = false)
+    private String userId;
+
+    @Column(name = "job_post_id", nullable = false)
+    private String jobPostId;
+
     @Column(nullable = false)
     private String title;
 
@@ -28,8 +34,11 @@ public class DashboardRecommendationEntity {
     @Column(nullable = false)
     private int score;
 
-    @Column(name = "reasons_json", nullable = false, columnDefinition = "text")
-    private String reasonsJson;
+    @Column(name = "risks_json", nullable = false, columnDefinition = "text")
+    private String risksJson;
+
+    @Column(nullable = false)
+    private String status;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -38,24 +47,33 @@ public class DashboardRecommendationEntity {
     }
 
     public DashboardRecommendationEntity(String id,
+                                         String userId,
+                                         String jobPostId,
                                          String title,
                                          String company,
                                          int score,
-                                         String reasonsJson) {
-        this(id, title, company, score, reasonsJson, Instant.now());
+                                         String risksJson,
+                                         String status) {
+        this(id, userId, jobPostId, title, company, score, risksJson, status, Instant.now());
     }
 
     public DashboardRecommendationEntity(String id,
+                                         String userId,
+                                         String jobPostId,
                                          String title,
                                          String company,
                                          int score,
-                                         String reasonsJson,
+                                         String risksJson,
+                                         String status,
                                          Instant createdAt) {
         this.id = id;
+        this.userId = userId;
+        this.jobPostId = jobPostId;
         this.title = title;
         this.company = company;
         this.score = score;
-        this.reasonsJson = reasonsJson;
+        this.risksJson = risksJson;
+        this.status = status;
         this.createdAt = createdAt;
     }
 
@@ -70,6 +88,14 @@ public class DashboardRecommendationEntity {
         return id;
     }
 
+    public String getUserId() {
+        return userId;
+    }
+
+    public String getJobPostId() {
+        return jobPostId;
+    }
+
     public String getTitle() {
         return title;
     }
@@ -82,8 +108,12 @@ public class DashboardRecommendationEntity {
         return score;
     }
 
-    public String getReasonsJson() {
-        return reasonsJson;
+    public String getRisksJson() {
+        return risksJson;
+    }
+
+    public String getStatus() {
+        return status;
     }
 
     public Instant getCreatedAt() {

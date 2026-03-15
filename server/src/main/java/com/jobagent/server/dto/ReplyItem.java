@@ -1,8 +1,8 @@
 package com.jobagent.server.dto;
 
 public record ReplyItem(
-    String company,
-    String intent,
+    String conversationId,
     String summary,
-    String nextAction
+    String intent,
+    java.time.Instant updatedAt
 ) {}

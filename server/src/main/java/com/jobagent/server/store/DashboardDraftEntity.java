@@ -19,14 +19,17 @@ public class DashboardDraftEntity {
     @Id
     private String id;
 
-    @Column(nullable = false)
-    private String company;
+    @Column(name = "user_id", nullable = false)
+    private String userId;
 
-    @Column(nullable = false)
-    private String title;
+    @Column(name = "conversation_id", nullable = false)
+    private String conversationId;
 
     @Column(nullable = false, columnDefinition = "text")
     private String content;
+
+    @Column(nullable = false)
+    private boolean approved;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -35,21 +38,24 @@ public class DashboardDraftEntity {
     }
 
     public DashboardDraftEntity(String id,
-                                String company,
-                                String title,
-                                String content) {
-        this(id, company, title, content, Instant.now());
+                                String userId,
+                                String conversationId,
+                                String content,
+                                boolean approved) {
+        this(id, userId, conversationId, content, approved, Instant.now());
     }
 
     public DashboardDraftEntity(String id,
-                                String company,
-                                String title,
+                                String userId,
+                                String conversationId,
                                 String content,
+                                boolean approved,
                                 Instant createdAt) {
         this.id = id;
-        this.company = company;
-        this.title = title;
+        this.userId = userId;
+        this.conversationId = conversationId;
         this.content = content;
+        this.approved = approved;
         this.createdAt = createdAt;
     }
 
@@ -64,19 +70,27 @@ public class DashboardDraftEntity {
         return id;
     }
 
-    public String getCompany() {
-        return company;
+    public String getUserId() {
+        return userId;
     }
 
-    public String getTitle() {
-        return title;
+    public String getConversationId() {
+        return conversationId;
     }
 
     public String getContent() {
         return content;
     }
 
+    public boolean isApproved() {
+        return approved;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public void setApproved(boolean approved) {
+        this.approved = approved;
     }
 }

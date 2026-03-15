@@ -46,6 +46,15 @@
 - 数据复盘与转化分析
 - 群控/自动投递
 
+**范围说明**
+- 本次为单一 MVP 交付物，包含插件、服务端、Worker 与工作台
+- 实施将按阶段推进，但不拆分为独立项目
+
+**实施阶段（计划视角）**
+1. 插件上报 + 服务端入库 + 基础审计闭环
+2. Worker 集成（评分/草稿/回复分类）+ 规则校验
+3. 工作台聚合与操作接口（审批/关闭/重生成）
+
 ---
 
 ## 总体架构
@@ -115,6 +124,18 @@
 - 有效期 24h
 - 支持刷新与撤销
 
+**认证请求/响应（最小）**
+- `RegisterRequest`: `{account, password, email?}`
+- `RegisterResponse`: `{user{id,account}}`
+- `LoginRequest`: `{account, password}`
+- `LoginResponse`: `{access_token, refresh_token, expires_in}`
+- `PluginTokenRequest`: `{access_token, browser_id}`
+- `PluginTokenResponse`: `{plugin_token, expires_in}`
+- `PluginRefreshRequest`: `{plugin_token}`
+- `PluginRefreshResponse`: `{plugin_token, expires_in}`
+- `PluginRevokeRequest`: `{plugin_token}`
+- `PluginRevokeResponse`: `{status}`
+
 ---
 
 ## 数据模型（核心实体）
@@ -148,6 +169,20 @@
 
 ---
 
+## 外部 ID 映射与唯一性
+
+**平台外部 ID 约定（Boss 直聘）**
+- `JobPost.externalId` = 职位详情页的唯一岗位 ID（从 URL 或页面 data 属性解析）
+- `Conversation.externalId` = 聊天会话 ID（插件上报 `conversation_id`）
+- `Message.externalId` = 聊天消息 ID（插件上报 `messages[].id`）
+
+**唯一性约束（MVP）**
+- JobPost 唯一：`source + external_id`
+- Conversation 唯一：`task_id + conversation_external_id`
+- Message 唯一：`conversation_id + message_external_id`
+
+---
+
 ## 状态机与触发
 
 **任务状态**
@@ -175,11 +210,32 @@
 - INTERVIEW（进入面试）
 - CLOSED（结束）
 
+**岗位状态流转（允许的状态迁移）**
+- DISCOVERED → ANALYZED（完成评分）
+- ANALYZED → SHORTLISTED（分数达阈值）
+- ANALYZED → ARCHIVED（分数未达阈值或用户忽略）
+- SHORTLISTED → DRAFTED（草稿生成）
+- DRAFTED → SENT（用户确认发送）
+- SENT → REPLIED（收到回复）
+- REPLIED → INTERVIEW（识别到面试意图）
+- REPLIED → CLOSED（明确拒绝/结束）
+- ANY → ARCHIVED（用户手动忽略/关闭）
+
+**会话状态流转（允许的状态迁移）**
+- NEW → WAITING_USER（草稿生成）
+- WAITING_USER → SENT（用户确认发送）
+- SENT → WAITING_HR（发送成功）
+- WAITING_HR → NEEDS_REPLY（收到回复且需要处理）
+- NEEDS_REPLY → WAITING_USER（生成回复草稿）
+- NEEDS_REPLY → INTERVIEW（识别为面试邀约）
+- INTERVIEW → CLOSED（面试结束或关闭）
+- ANY → CLOSED（用户手动关闭）
+
 **触发与责任方（摘要）**
 - 页面上报 → JobPost/JobMatch 写入（插件 + 服务端）
-- 草稿生成 → DRAFTED（服务端 + Worker）
-- 用户点击发送 → SENT（插件）
-- 聊天上报 → REPLIED/NEEDS_REPLY/INTERVIEW（插件 + Worker）
+- 草稿生成 → JobPost.DRAFTED / Conversation.WAITING_USER（服务端 + Worker）
+- 用户点击发送 → JobPost.SENT / Conversation.SENT（插件）
+- 聊天上报 → Conversation.NEEDS_REPLY/INTERVIEW（插件 + Worker）
 
 **状态映射**
 - Conversation 状态 = NEEDS_REPLY → JobPost 状态 = REPLIED
@@ -195,9 +251,15 @@
 - `GET /api/tasks` 任务列表（需登录）
 - `POST /api/resume` 上传简历（需登录）
 - `GET /api/resume` 获取最新简历（需登录）
+- `PATCH /api/tasks/{task_id}` 更新任务（需登录）
 
 **工作台**
 - `GET /api/dashboard` 获取聚合快照（需登录）
+- `GET /api/conversations/{id}` 获取会话详情（需登录）
+- `POST /api/drafts/{id}/approve` 审批草稿（需登录）
+- `POST /api/drafts/{id}/reject` 驳回草稿（需登录）
+- `POST /api/conversations/{id}/close` 关闭会话（需登录）
+- `POST /api/conversations/{id}/regenerate` 重新生成草稿（需登录）
 
 **插件上报**
 - `POST /plugin/page/report`（插件 token）
@@ -214,6 +276,25 @@
   响应：`StatusResponse`
 
 **请求 Schema（最小）**
+- `CreateTaskRequest`:
+  - `title` (string)
+  - `city` (string)
+  - `salary` (string)
+  - `experience` (string)
+  - `exclude` (array[string])
+  - `preferences` (array[string])
+  - `automation_level` (string: CONSERVATIVE/SEMI/AUTO)
+  - `strategy_text` (string, 用户自然语言输入)
+- `CreateTask 处理规则`:
+  - 服务端调用 Worker `/worker/goal-parse`（`stage=GOAL_PARSE`）将 `strategy_text` 转为 `strategy_json`
+  - `strategy_json` 持久化到 JobTask，用于 JobMatchGraph
+- `UpdateTaskRequest`:
+  - 同 `CreateTaskRequest`，全部可选
+  - 若 `strategy_text` 变化，触发 Worker `/worker/goal-parse` 生成 `strategy_json`
+- `ResumeUploadRequest`:
+  - `content` (string, 原文/抽取文本)
+  - `format` (string: PDF/TEXT)
+  - `source` (string, optional)
 - `PageReportRequest`:
   - `task_id` (string)
   - `page_type` (list/detail)
@@ -221,10 +302,11 @@
   - `extracted_json` (object)
   - `source_url` (string)
   - `dom_hash` (string)
+  - `want_draft` (boolean, 仅 detail 页有效)
 - `ChatReportRequest`:
   - `task_id` (string)
-  - `conversation_id` (string)
-  - `messages` (array)
+  - `conversation_id` (string, 对应 Conversation.externalId)
+  - `messages` (array[{id,role,text,ts}])
   - `last_message_id` (string)
 - `ActionReportRequest`:
   - `task_id` (string)
@@ -239,7 +321,13 @@
   - `ts` (number)
 
 **响应 Schema（最小）**
-- `PageReportResponse`: `status`, `analysis{score,reasons,risks}`, `draft{company,title,content}`
+- `CreateTaskResponse`:
+  - `task{id, strategy_json, status, automation_level, created_at}`
+- `TaskListResponse`:
+  - `tasks[]` (包含 `strategy_json`)
+- `ResumeResponse`:
+  - `resume{id, parsed_json, created_at}`
+- `PageReportResponse`: `status`, `analysis{score,reasons,risks}`, `draft?{company,title,content}`
 - `ChatReportResponse`: `status`, `reply{intent,summary,next_action}`
 - `StatusResponse`: `status`
 
@@ -249,6 +337,37 @@
   - `recommendations[]`
   - `drafts[]`
   - `replies[]`
+  - `interviews[]`
+  - `updated_at`
+
+**实体响应字段（最小）**
+- `recommendations[]`: `{job_post_id,title,company,score,risks,status}`
+- `drafts[]`: `{draft_id,conversation_id,content,created_at,approved}`
+- `replies[]`: `{conversation_id,summary,intent,updated_at}`
+- `interviews[]`: `{conversation_id,company,title,scheduled_at?}`
+
+**工作台操作请求（最小）**
+- `POST /api/drafts/{id}/approve`:
+  - req: `{action: "approve"}`
+  - resp: `{status, draft{approved}, action_hint{fill_content}}`
+- `POST /api/drafts/{id}/reject`:
+  - req: `{reason?}`
+  - resp: `{status}`
+- `POST /api/conversations/{id}/close`:
+  - req: `{reason?}`
+  - resp: `{status, conversation{status:"CLOSED"}}`
+- `POST /api/conversations/{id}/regenerate`:
+  - req: `{style?}`
+  - resp: `{status, draft{content}}`
+
+**通用错误响应（非插件 API）**
+- 响应体：`error{code,message}`
+- 401 `UNAUTHORIZED`
+- 403 `FORBIDDEN`
+- 404 `NOT_FOUND`
+- 400 `VALIDATION_FAILED`
+- 429 `RATE_LIMITED`
+- 500 `SERVER_ERROR`
 
 ---
 
@@ -267,26 +386,45 @@
 - 输出：MessageDraft + ReplyIntent + NextAction
 
 **Worker API（最小）**
+- `POST /worker/goal-parse`
+  - req: `{task_id, stage, strategy_text, idempotency_key}`
+  - resp: `{strategy_json}`
 - `POST /worker/job-match`
-  - req: `{task_id, job_post, resume, strategy}`
+  - req: `{task_id, stage, job_post, resume, strategy, idempotency_key}`
   - resp: `{score, reasons[], risks[]}`
 - `POST /worker/draft`
-  - req: `{conversation, job_post, resume}`
+  - req: `{task_id, stage, conversation, job_post, resume, idempotency_key}`
   - resp: `{content}`
 - `POST /worker/reply-classify`
-  - req: `{conversation, messages}`
+  - req: `{task_id, stage, conversation, messages, last_message_id, idempotency_key}`
   - resp: `{intent, summary, next_action}`
 
 **服务端与 Worker 集成契约**
 - 调用方式：同步 HTTP（MVP）
 - 超时：10s
 - 重试：2 次
-- 幂等：基于 `task_id + external_id + stage`
+- 幂等：基于 `idempotency_key`
+- Worker 鉴权：内部网络 + `X-Worker-Token` 共享密钥（MVP）
+
+**插件上报同步性（MVP）**
+- `page/report` 与 `chat/report` 为同步调用，服务端在请求内调用 Worker
+- Worker 超时返回 504，插件提示用户稍后重试
+- `page/report` 仅在 `page_type=detail` 且 `want_draft=true` 时返回 `draft`
 
 **Stage 枚举**
+- `GOAL_PARSE`
 - `JOB_MATCH`
 - `DRAFT`
 - `REPLY_CLASSIFY`
+
+**idempotency_key 生成规则（MVP）**
+- GOAL_PARSE: `task_id + stage + strategy_text_hash`
+- JOB_MATCH: `task_id + stage + job_post.external_id + job_post.source`
+- DRAFT: `task_id + stage + conversation.external_id + job_post.external_id`
+- REPLY_CLASSIFY: `task_id + stage + conversation.external_id + last_message_id`
+
+**strategy_text_hash 规则**
+- `strategy_text` 去空白与大小写归一后取 SHA-256
 
 ---
 
@@ -307,7 +445,7 @@
 ## 去重与幂等策略
 
 - JobPost 去重：`source + external_id`
-- Conversation 去重：`task_id + conversation_id`
+- Conversation 去重：`task_id + conversation_external_id`
 - MessageDraft 去重：`conversation_id + source_type`
 
 ---
@@ -319,6 +457,19 @@
 3. 全链路审计（AuditLog）
 4. 模型输出规则校验（敏感词/格式/长度）
 5. 数据保留策略：默认 90 天
+
+**模型输出规则校验（MVP 规则）**
+- 长度：首轮草稿 `10-500` 字符；回复摘要 `<= 200` 字符
+- 禁止联系方式：手机号、邮箱、微信号、QQ 号
+- 禁止敏感词：涉黄/涉政/辱骂（基于可配置词表）
+- 禁止夸张承诺：如“保证录用/100%录取”
+- 执行点：Worker 输出后进入服务端规则层，校验失败返回 `VALIDATION_FAILED`
+
+**插件错误处理（MVP）**
+- 401 `PLUGIN_TOKEN_INVALID`: 需重新登录插件
+- 400 `VALIDATION_FAILED`: 显示校验原因，允许用户手动修改
+- 409 `DUPLICATE_IGNORED`: 已存在记录，响应体返回已有分析/草稿
+- 504 `WORKER_TIMEOUT`: 提示稍后重试
 
 ---
 

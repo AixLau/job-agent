@@ -7,5 +7,5 @@ import java.util.Optional;
 
 public interface ResumeRepository extends JpaRepository<ResumeEntity, String> {
 
-    Optional<ResumeEntity> findFirstByOrderByCreatedAtDesc();
+    Optional<ResumeEntity> findFirstByUserIdOrderByCreatedAtDesc(String userId);
 }

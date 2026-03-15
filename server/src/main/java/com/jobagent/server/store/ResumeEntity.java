@@ -15,6 +15,9 @@ public class ResumeEntity {
     @Id
     private String id;
 
+    @Column(nullable = false)
+    private String userId;
+
     @Column(nullable = false, columnDefinition = "text")
     private String content;
 
@@ -27,8 +30,9 @@ public class ResumeEntity {
     protected ResumeEntity() {
     }
 
-    public ResumeEntity(String id, String content, String parsedJson) {
+    public ResumeEntity(String id, String userId, String content, String parsedJson) {
         this.id = id;
+        this.userId = userId;
         this.content = content;
         this.parsedJson = parsedJson;
         this.createdAt = Instant.now();
@@ -43,6 +47,10 @@ public class ResumeEntity {
 
     public String getId() {
         return id;
+    }
+
+    public String getUserId() {
+        return userId;
     }
 
     public String getContent() {

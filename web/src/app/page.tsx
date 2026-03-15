@@ -1,13 +1,28 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { fetchDashboard, fallbackDashboard } from "../lib/dashboard";
 import { fetchTasks } from "../lib/tasks";
 
-export default async function Home() {
-  const dashboard = await fetchDashboard();
-  const tasks = await fetchTasks();
+export default function Home() {
+  const [dashboard, setDashboard] = useState(fallbackDashboard);
+  const [tasks, setTasks] = useState([]);
+  const baseUrl = useMemo(
+    () => process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8080",
+    []
+  );
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token") || "";
+    fetchDashboard(baseUrl, token).then(setDashboard);
+    fetchTasks(baseUrl, token).then(setTasks);
+  }, [baseUrl]);
+
   const metrics = dashboard.metrics ?? fallbackDashboard.metrics;
   const recommendations = dashboard.recommendations ?? [];
   const drafts = dashboard.drafts ?? [];
   const replies = dashboard.replies ?? [];
+  const interviews = dashboard.interviews ?? [];
   const taskList = Array.isArray(tasks) ? tasks : [];
 
   const highlights = [
@@ -20,33 +35,39 @@ export default async function Home() {
   const hasRecommendations = recommendations.length > 0;
   const hasDrafts = drafts.length > 0;
   const hasReplies = replies.length > 0;
+  const hasInterviews = interviews.length > 0;
 
   const fallbackRecommendations = [
-    { title: "资深产品经理", company: "智聘科技", score: 86, reasons: ["匹配度高，JD 清晰"] },
-    { title: "B端产品负责人", company: "星火互娱", score: 82, reasons: ["经验要求匹配"] },
-    { title: "运营策略专家", company: "云图", score: 79, reasons: ["薪资区间匹配"] },
+    { title: "资深产品经理", company: "智聘科技", score: 86, risks: ["匹配度高，JD 清晰"] },
+    { title: "B端产品负责人", company: "星火互娱", score: 82, risks: ["经验要求匹配"] },
+    { title: "运营策略专家", company: "云图", score: 79, risks: ["薪资区间匹配"] },
   ];
 
   const fallbackDrafts = [
-    { company: "智聘科技", title: "资深产品经理", content: "等待确认" },
-    { company: "星火互娱", title: "B端产品负责人", content: "等待确认" },
+    { conversationId: "c1", content: "等待确认" },
+    { conversationId: "c2", content: "等待确认" },
   ];
 
   const fallbackReplies = [
-    { company: "云图", intent: "面试邀约", summary: "1小时前" },
-    { company: "山海数据", intent: "补充材料", summary: "3小时前" },
+    { conversationId: "c3", intent: "INTERVIEW", summary: "1小时前" },
+    { conversationId: "c4", intent: "NEEDS_REPLY", summary: "3小时前" },
+  ];
+
+  const fallbackInterviews = [
+    { conversationId: "c5", company: "云图", title: "产品经理" },
   ];
 
   const displayRecommendations = hasRecommendations ? recommendations : fallbackRecommendations;
   const displayDrafts = hasDrafts ? drafts : fallbackDrafts;
   const displayReplies = hasReplies ? replies : fallbackReplies;
+  const displayInterviews = hasInterviews ? interviews : fallbackInterviews;
   const displayTasks = taskList.length > 0
     ? taskList
     : [
         {
-          task_id: "demo-task",
+          id: "demo-task",
           status: "ACTIVE",
-          target_role: "产品经理",
+          title: "产品经理",
           city: "上海",
           salary: "20k-30k",
         },
@@ -89,7 +110,7 @@ export default async function Home() {
                   <p className="title">{item.title}</p>
                   <p className="muted">{item.company}</p>
                   <p className="hint">
-                    {Array.isArray(item.reasons) ? item.reasons.join(" / ") : ""}
+                    {Array.isArray(item.risks) ? item.risks.join(" / ") : ""}
                   </p>
                 </div>
                 <div className="score">{item.score}</div>
@@ -106,12 +127,12 @@ export default async function Home() {
             </div>
             <div className="list">
               {displayDrafts.map((item) => (
-                <div className="list-item compact" key={item.company}>
+                <div className="list-item compact" key={item.draftId ?? item.conversationId}>
                   <div>
-                    <p className="title">{item.company}</p>
-                    <p className="muted">{item.title}</p>
+                    <p className="title">{item.conversationId ?? "草稿"}</p>
+                    <p className="muted">{item.content ?? ""}</p>
                   </div>
-                  <span className="tag">待确认</span>
+                  <span className="tag">{item.approved ? "已确认" : "待确认"}</span>
                 </div>
               ))}
             </div>
@@ -124,9 +145,9 @@ export default async function Home() {
             </div>
             <div className="list">
               {displayReplies.map((item) => (
-                <div className="list-item compact" key={item.company}>
+                <div className="list-item compact" key={item.conversationId}>
                   <div>
-                    <p className="title">{item.company}</p>
+                    <p className="title">{item.conversationId}</p>
                     <p className="muted">{item.intent}</p>
                   </div>
                   <span className="tag ghost">
@@ -141,14 +162,32 @@ export default async function Home() {
 
       <section className="card">
         <div className="card-head">
+          <h2>面试进展</h2>
+          <span className="pill">{displayInterviews.length}</span>
+        </div>
+        <div className="list">
+          {displayInterviews.map((item) => (
+            <div className="list-item compact" key={item.conversationId}>
+              <div>
+                <p className="title">{item.company || "公司"}</p>
+                <p className="muted">{item.title || "岗位"}</p>
+              </div>
+              <span className="tag">面试</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
           <h2>当前任务</h2>
           <span className="pill">{displayTasks.length}</span>
         </div>
         <div className="list">
           {displayTasks.map((task) => (
-            <div className="list-item compact" key={task.task_id ?? task.target_role}>
+            <div className="list-item compact" key={task.id ?? task.title}>
               <div>
-                <p className="title">{task.target_role ?? "未命名任务"}</p>
+                <p className="title">{task.title ?? "未命名任务"}</p>
                 <p className="muted">
                   {task.city ?? "未知城市"} · {task.salary ?? "薪资未设定"}
                 </p>
