@@ -242,7 +242,7 @@
 - [x] Step 6: 在 `JobPostService` 接入黑名单与忽略过滤
 - [x] Step 7: 让 dashboard/recommendation 查询只返回可见岗位
 - [x] Step 8: 运行测试，确认通过
-- [ ] Step 9: 提交
+- [x] Step 9: 提交
 
 ---
 
@@ -261,11 +261,11 @@
 - Test: `server/src/test/java/com/jobagent/server/controller/AuditControllerTest.java`
 - Test: `web/tests/audits.test.mjs`
 
-- [ ] Step 1: 写失败测试，覆盖 `result/model_output/risk_tags` 输出
-- [ ] Step 2: 运行测试，确认失败
-- [ ] Step 3: 扩展审计存储结构与记录入口
-- [ ] Step 4: 让审计页展示详细字段
-- [ ] Step 5: 运行后端/Web 测试，确认通过
+- [x] Step 1: 写失败测试，覆盖 `result/model_output/risk_tags` 输出
+- [x] Step 2: 运行测试，确认失败
+- [x] Step 3: 扩展审计存储结构与记录入口
+- [x] Step 4: 让审计页展示详细字段
+- [x] Step 5: 运行后端/Web 测试，确认通过
 - [ ] Step 6: 提交
 
 ### Task 6: Expand model output validation coverage

@@ -1,5 +1,7 @@
 package com.jobagent.server.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobagent.server.dto.AuditItem;
 import com.jobagent.server.dto.AuditListResponse;
 import com.jobagent.server.repository.AuditLogRepository;
@@ -19,10 +21,12 @@ public class AuditController {
 
     private final AuthService authService;
     private final AuditLogRepository auditLogRepository;
+    private final ObjectMapper objectMapper;
 
-    public AuditController(AuthService authService, AuditLogRepository auditLogRepository) {
+    public AuditController(AuthService authService, AuditLogRepository auditLogRepository, ObjectMapper objectMapper) {
         this.authService = authService;
         this.auditLogRepository = auditLogRepository;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping
@@ -35,12 +39,23 @@ public class AuditController {
             .map(entity -> new AuditItem(
                 entity.getActionType(),
                 entity.getCreatedAt(),
-                null,
+                entity.getResult(),
                 entity.getPayload(),
-                null,
-                List.of()
+                entity.getModelOutput(),
+                readRiskTags(entity.getRiskTagsJson())
             ))
             .toList();
         return new AuditListResponse(items, page, size, auditPage.getTotalElements());
+    }
+
+    private List<String> readRiskTags(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (Exception ex) {
+            return List.of();
+        }
     }
 }

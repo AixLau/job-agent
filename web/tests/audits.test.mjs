@@ -15,10 +15,10 @@ test("fetchAudits returns paginated data and sends auth header", async () => {
           {
             action_type: "JOB_FOLLOW",
             created_at: "2024-01-01T00:00:00Z",
-            result: null,
+            result: "OK",
             payload: "{\"job_post_id\":\"job-1\"}",
-            model_output: null,
-            risk_tags: [],
+            model_output: "{\"status\":\"followed\"}",
+            risk_tags: ["高优先级"],
           },
         ],
         page: 0,
@@ -31,6 +31,9 @@ test("fetchAudits returns paginated data and sends auth header", async () => {
     const data = await fetchAudits("http://example.com", "token", 0, 10);
     assert.equal(data.items.length, 1);
     assert.equal(data.items[0].actionType, "JOB_FOLLOW");
+    assert.equal(data.items[0].result, "OK");
+    assert.equal(data.items[0].modelOutput, "{\"status\":\"followed\"}");
+    assert.deepEqual(data.items[0].riskTags, ["高优先级"]);
     assert.equal(data.page, 0);
     assert.equal(data.size, 10);
     assert.equal(data.total, 1);

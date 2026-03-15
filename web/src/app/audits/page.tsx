@@ -40,7 +40,9 @@ export default function AuditsPage() {
             <div className="list-item compact" key={`${item.actionType}-${index}`}>
               <div>
                 <p className="title">{item.actionType || "UNKNOWN"}</p>
+                <p className="muted">结果：{item.result || "UNKNOWN"}</p>
                 <p className="muted">{item.payload || "{}"}</p>
+                <p className="muted">模型输出：{item.modelOutput || "无"}</p>
                 <p className="hint">
                   {Array.isArray(item.riskTags) && item.riskTags.length > 0
                     ? item.riskTags.join(" / ")

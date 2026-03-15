@@ -51,9 +51,25 @@ class AuditControllerTest {
         String token = registerAndLogin("alice");
         UserEntity user = userRepository.findByAccount("alice").orElseThrow();
         auditLogRepository.deleteAll();
-        auditLogRepository.save(new AuditLogEntity(UUID.randomUUID().toString(), user.getId(), "TASK_CREATE", "{\"task_id\":\"t1\"}"));
+        auditLogRepository.save(new AuditLogEntity(
+            UUID.randomUUID().toString(),
+            user.getId(),
+            "TASK_CREATE",
+            "{\"task_id\":\"t1\"}",
+            "OK",
+            "{\"score\":80}",
+            "[\"外包\"]"
+        ));
         Thread.sleep(5);
-        auditLogRepository.save(new AuditLogEntity(UUID.randomUUID().toString(), user.getId(), "JOB_FOLLOW", "{\"job_post_id\":\"j1\"}"));
+        auditLogRepository.save(new AuditLogEntity(
+            UUID.randomUUID().toString(),
+            user.getId(),
+            "JOB_FOLLOW",
+            "{\"job_post_id\":\"j1\"}",
+            "OK",
+            "{\"status\":\"followed\"}",
+            "[\"高优先级\"]"
+        ));
 
         String response = mockMvc.perform(get("/api/audits?page=0&size=10")
                 .header("Authorization", "Bearer " + token))
@@ -70,6 +86,9 @@ class AuditControllerTest {
         assertThat(payload.get("total")).isEqualTo(2);
         assertThat(items.get(0).get("action_type")).isEqualTo("JOB_FOLLOW");
         assertThat(items.get(0)).containsKeys("created_at", "payload", "result", "model_output", "risk_tags");
+        assertThat(items.get(0).get("result")).isEqualTo("OK");
+        assertThat(items.get(0).get("model_output")).isEqualTo("{\"status\":\"followed\"}");
+        assertThat((List<?>) items.get(0).get("risk_tags")).hasSize(1);
     }
 
     @Test

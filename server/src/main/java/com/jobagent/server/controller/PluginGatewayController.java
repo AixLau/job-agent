@@ -11,6 +11,7 @@ import com.jobagent.server.service.AuthService;
 import com.jobagent.server.service.ConversationService;
 import com.jobagent.server.service.JobPostService;
 import com.jobagent.server.service.AuditService;
+import com.jobagent.server.service.WorkerOutputAuditMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
 import org.springframework.http.HttpStatus;
@@ -30,28 +31,48 @@ public class PluginGatewayController {
     private final ConversationService conversationService;
     private final AuthService authService;
     private final AuditService auditService;
+    private final WorkerOutputAuditMapper workerOutputAuditMapper;
 
     public PluginGatewayController(JobPostService jobPostService,
                                    ConversationService conversationService,
                                    AuthService authService,
-                                   AuditService auditService) {
+                                   AuditService auditService,
+                                   WorkerOutputAuditMapper workerOutputAuditMapper) {
         this.jobPostService = jobPostService;
         this.conversationService = conversationService;
         this.authService = authService;
         this.auditService = auditService;
+        this.workerOutputAuditMapper = workerOutputAuditMapper;
     }
 
     @PostMapping("/page/report")
     public PageReportResponse pageReport(@RequestHeader("X-Plugin-Token") String pluginToken,
                                          @Valid @RequestBody PageReportRequest request) {
         String userId = authService.requireUserIdFromPluginToken(pluginToken);
-        auditService.record(userId, "PLUGIN_PAGE_REPORT",
-            "{\"task_id\":\"" + request.taskId() + "\"}");
         try {
-            return jobPostService.handlePageReport(request, userId);
+            PageReportResponse response = jobPostService.handlePageReport(request, userId);
+            WorkerOutputAuditMapper.AuditRecord record = workerOutputAuditMapper.pageSuccess(request, response);
+            auditService.record(userId, "PLUGIN_PAGE_REPORT", record.payload(), record.result(), record.modelOutput(), record.riskTags());
+            return response;
         } catch (ValidationException ex) {
+            auditService.record(
+                userId,
+                "PLUGIN_PAGE_REPORT",
+                workerOutputAuditMapper.failurePayload(java.util.Map.of("task_id", request.taskId())),
+                "VALIDATION_FAILED",
+                null,
+                java.util.List.of()
+            );
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
         } catch (RestClientException ex) {
+            auditService.record(
+                userId,
+                "PLUGIN_PAGE_REPORT",
+                workerOutputAuditMapper.failurePayload(java.util.Map.of("task_id", request.taskId())),
+                "WORKER_TIMEOUT",
+                null,
+                java.util.List.of()
+            );
             throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "WORKER_TIMEOUT");
         }
     }
@@ -60,13 +81,30 @@ public class PluginGatewayController {
     public ChatReportResponse chatReport(@RequestHeader("X-Plugin-Token") String pluginToken,
                                          @Valid @RequestBody ChatReportRequest request) {
         String userId = authService.requireUserIdFromPluginToken(pluginToken);
-        auditService.record(userId, "PLUGIN_CHAT_REPORT",
-            "{\"task_id\":\"" + request.taskId() + "\"}");
         try {
-            return conversationService.handleChatReport(request, userId);
+            ChatReportResponse response = conversationService.handleChatReport(request, userId);
+            WorkerOutputAuditMapper.AuditRecord record = workerOutputAuditMapper.chatSuccess(request, response);
+            auditService.record(userId, "PLUGIN_CHAT_REPORT", record.payload(), record.result(), record.modelOutput(), record.riskTags());
+            return response;
         } catch (ValidationException ex) {
+            auditService.record(
+                userId,
+                "PLUGIN_CHAT_REPORT",
+                workerOutputAuditMapper.failurePayload(java.util.Map.of("task_id", request.taskId())),
+                "VALIDATION_FAILED",
+                null,
+                java.util.List.of()
+            );
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED");
         } catch (RestClientException ex) {
+            auditService.record(
+                userId,
+                "PLUGIN_CHAT_REPORT",
+                workerOutputAuditMapper.failurePayload(java.util.Map.of("task_id", request.taskId())),
+                "WORKER_TIMEOUT",
+                null,
+                java.util.List.of()
+            );
             throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "WORKER_TIMEOUT");
         }
     }
@@ -75,9 +113,9 @@ public class PluginGatewayController {
     public StatusResponse actionReport(@RequestHeader("X-Plugin-Token") String pluginToken,
                                        @Valid @RequestBody ActionReportRequest request) {
         String userId = authService.requireUserIdFromPluginToken(pluginToken);
-        auditService.record(userId, "PLUGIN_ACTION",
-            "{\"task_id\":\"" + request.taskId() + "\"}");
         conversationService.handleActionReport(request, userId);
+        WorkerOutputAuditMapper.AuditRecord record = workerOutputAuditMapper.actionResult(request, "OK");
+        auditService.record(userId, "PLUGIN_ACTION", record.payload(), record.result(), record.modelOutput(), record.riskTags());
         return new StatusResponse("ok");
     }
 
